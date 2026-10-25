@@ -44,8 +44,14 @@ This file is the source of truth. Several agents may work on this project in seq
 | Sheets access | Google service account (JSON key), sheet shared with its email | Key lives outside the repo. |
 | Develop against | A duplicate of the real sheet | Switch to the real one only at the end (step 10). |
 | Licensing | VoiceInk is GPLv3: do not copy its code | Using the same model file is fine. The repo license is MIT, chosen by Mauro when he created the GitHub repo (`krsmauro/speech-to-sheets`, 2026-10-25); the `LICENSE` file lives on the remote `main`. |
+| No personal data in the repo | Column headers and categories are never hardcoded. Headers are mapped by the `speech-to-sheets init` command (connects to the sheet, proposes a mapping, asks to confirm) and stored in `config.yaml`; categories are read from the category column's dropdown at runtime, with `sheets.fallback_categories` in config as a fallback. All config keys and defaults are in English. | Decided 2026-10-25. Mauro's categories are already in the first pushed commit and he accepts that, but the final version must not contain them (step 11). |
+| Column mapping | Four fixed roles: date, amount, category, description, set in config as `sheets.columns` (role to header text in row 1). The bot finds columns by header text, writes only to those columns, and finds the next empty row from the date column. | Reordering columns or extra columns on the sheet break nothing. Arbitrary extra fields (payment method, etc.) are out of scope for now. |
+| Slang and locale hints | None. No slang lists or per-locale hint files. | Decided 2026-10-25 by Mauro. The model handles plain spoken numbers; he tunes from real use. Language, timezone and the minimum-amount check are plain config values. |
+| Deployment | Mac first; later an always-on cheap Linux server | Socket Mode needs no inbound ports. Sizing notes below. |
 
-## The sheet
+## Mauro's sheet (development reference only)
+
+> Personal example used while developing. The code must read headers and categories from the connected sheet and never hardcode them. Step 11 removes these details from the repo.
 
 Four columns, header on row 1, filters on:
 
@@ -58,16 +64,27 @@ Four columns, header on row 1, filters on:
 
 Traps to handle:
 - Writing a date as text like `05/10/2026` can be parsed as May 10 if the sheet locale is US. Write a serial number and verify.
-- Column F and below the table may contain other content (the cursor was on F223). Append to an explicit next empty row in A:D, never rely on auto table detection.
-- Amounts are spoken in Colombian Spanish: `veinte mil`, `20 lucas`, `dos palos`, `un millón doscientos`. Amounts under about 1,000 COP are suspicious: ask a follow-up instead of logging.
+- Column F and below the table may contain other content (the cursor was on F223). Append to an explicit next empty row in the four mapped columns, never rely on auto table detection.
+- Amounts are spoken as plain numbers (for example `veinte mil`). Mauro's sheet is in COP, so amounts under 1,000 are suspicious: `sanity.min_amount` (default 0 = off, Mauro sets 1000) makes the bot ask a follow-up instead of logging.
 
 ## Environment facts (verified 2026-10-25, macOS arm64, Apple M4)
 
 - `whisper-cli` at `/opt/homebrew/bin/whisper-cli` (Homebrew, Metal backend). `ffmpeg` and `uv` also in `/opt/homebrew/bin`.
-- Model: `~/Library/Application Support/com.prakashjoshipax.VoiceInk/WhisperModels/ggml-large-v3-turbo-q5_0.bin`. For other users the README must explain downloading it from the whisper.cpp model repository; the path is configurable.
+- Machine: Apple M4, 10 cores, 24 GB RAM.
+- Model: `~/Library/Application Support/com.prakashjoshipax.VoiceInk/WhisperModels/ggml-large-v3-turbo-q5_0.bin` (547 MB). For other users the README must explain downloading it from the whisper.cpp model repository; the path is configurable.
 - Tested: 16 kHz mono wav from ffmpeg, `whisper-cli -m <model> -f <wav> -nt -l auto`, a long Spanish clip transcribed correctly in about 13 s wall time.
 - System `python3` is 3.14.5: do not use it for the project.
 - Sibling repo `../VoiceInk` exists (reference only).
+
+## Deployment notes (cheap always-on Linux server)
+
+Estimates from general knowledge, NOT measured. Step 11 includes a benchmark on the real server.
+
+- **No inbound ports needed** (Socket Mode). Firewall everything except SSH. Run as a non-root user, `chmod 600` the Google key and the env file, load secrets through the service manager's environment file, enable automatic security updates.
+- **With local speech-to-text:** the model file is 547 MB and whisper.cpp needs roughly 1 to 1.5 GB of RAM with it loaded, so aim for 2 vCPU, 4 GB RAM, 20 GB disk (2 GB RAM plus swap may work). Without a GPU, transcription is much slower than the 13 s measured on the M4; a short voice note could take tens of seconds on 2 vCPUs. x86 or ARM both work; build whisper.cpp natively on the server. Smaller or more quantized models (`small`, `base`) trade accuracy for speed.
+- **Without speech-to-text** (text and photos only) the process is mostly idle and 512 MB to 1 GB of RAM is enough.
+- **A hosted transcription API** would allow a tiny server but sends audio to a third party. Not chosen; Anthropic has no audio input.
+- A Docker image that builds whisper.cpp is planned for portability (step 11). It is for servers; on a Mac, Docker cannot use the GPU, so run natively there.
 
 ## Target layout
 
@@ -75,16 +92,18 @@ Each line is one file. Keep it this way when adding code.
 
 ```
 src/speech_to_sheets/
-  config/    settings.py categories.py
+  config/    settings.py columns.py
   slack/     client.py allowlist.py files.py thread.py replies.py
   stt/       convert.py whisper.py
   extract/   schema.py prompt.py client.py sanity.py
-  sheets/    client.py examples.py dates.py append.py read_row.py
+  sheets/    client.py schema.py examples.py dates.py append.py read_row.py
   dedupe/    store.py prune.py
   pipeline/  bundle.py handle_message.py
+  cli/       init.py prompts.py write_config.py
   main.py
 tests/       one test file per module, plus test_file_length.py
-docs/        setup-slack.md  setup-google.md
+docs/        setup-slack.md  setup-google.md  deployment.md
+deploy/      launchd and systemd examples, Dockerfile (step 11)
 ```
 
 Flow: Slack DM event, then allowlist check and dedupe, then `bundle` (text + transcripts + images), then `extract` (Claude), then `sanity`. If complete: `sheets.append`, then `sheets.read_row` reads the written row back, then a Slack thread reply shows what was recorded, for example `Logged in row 224: 05/10/2026 | $38,921 | Herramientas | Upwork`. If the entry is incomplete: reply with a question in the thread. If the write fails: reply with the error and do not say it was logged.
@@ -96,26 +115,30 @@ Create the project skeleton with `uv` (Python 3.12 pinned). Dependencies: `slack
 **Acceptance:** `uv run pytest` passes; `uv run ruff check` is clean; `git status` shows no secrets or ignored artefacts staged.
 
 ### [ ] 2. Config and secrets
-`config/settings.py` loads env vars (`.env` via python-dotenv) and `config.yaml`; `config/categories.py` exposes the Concepto list from config. Settings: Slack bot/app tokens, allowed Slack user ID, Anthropic key, Google key path, sheet ID and tab name, whisper model path, timezone. Fail fast with a clear message when something is missing; never log secret values.
-**Acceptance:** unit tests for missing/invalid config; `config.example.yaml` contains the 12 categories.
+`config/settings.py` loads env vars (`.env` via python-dotenv) and `config.yaml`; `config/columns.py` holds the role-to-header mapping (`sheets.columns`). Settings: Slack bot/app tokens, allowed Slack user ID, Anthropic key, Google key path, sheet ID and tab name, `sheets.columns`, `sheets.fallback_categories`, whisper CLI, model path and language (default `auto`), timezone (default `UTC`), `sanity.min_amount` (default 0 = off), `dedupe` settings. All keys and defaults are in English; see `config.example.yaml`. Fail fast with a clear message when something is missing; never log secret values.
+**Acceptance:** unit tests for missing/invalid config and defaults; `config.example.yaml` contains only generic example values (no personal categories or paths).
 
 ### [ ] 3. Speech-to-text (whisper)
-`stt/convert.py`: ffmpeg to 16 kHz mono wav (accept whatever Slack sends: m4a, mp4, ogg, etc.). `stt/whisper.py`: run `whisper-cli` via `subprocess` (no shell string building), return the transcript text, timeout, clear error if the binary or model is missing. Default `-l es` since voice notes are Spanish only (make it configurable). Treat an empty or near-empty transcript as "no speech", never as an expense.
+`stt/convert.py`: ffmpeg to 16 kHz mono wav (accept whatever Slack sends: m4a, mp4, ogg, etc.). `stt/whisper.py`: run `whisper-cli` via `subprocess` (no shell string building), return the transcript text, timeout, clear error if the binary or model is missing. The language comes from config (`stt.language`, default `auto`; Mauro sets `es`). Treat an empty or near-empty transcript as "no speech", never as an expense.
 Do NOT write, generate or record audio tests or fixtures (Mauro's rule): no `say`-generated files, no sample recordings, no STT accuracy eval. Unit-test only with the subprocess mocked (command built correctly, timeout, missing binary or model, empty transcript). Accuracy is judged by Mauro using the real bot once the MVP works; if it fails he will tweak (for example `-l`, whisper's `--prompt`) from real failures.
 **Acceptance:** unit tests pass with `subprocess` mocked; no audio files exist in the repo.
 
 ### [ ] 4. Extraction (Claude)
-`extract/schema.py`: result is either `Complete{valor:int, concepto:enum, descripcion:str}` or `NeedsInfo{question:str, partial}`. The enum is built at runtime from config. `extract/prompt.py`: English instructions, Spanish examples; includes the sheet rows as few-shot. `extract/client.py`: call `claude-haiku-5-5` with structured output (`output_config.format`) and image blocks when present; set `output_config.effort` to `low` (Haiku 5.5 defaults to `medium` with thinking on); do not send `temperature`/`top_p`/`top_k` or an assistant prefill. Check the live API docs before writing the call; the SDK drifts. `extract/sanity.py`: category must be in the enum, `valor` must be positive, under about 1,000 COP triggers a follow-up.
+`extract/schema.py`: result is either `Complete{valor:int, concepto:enum, descripcion:str}` or `NeedsInfo{question:str, partial}`. The enum is built at runtime from the categories read from the sheet (`sheets/schema.py`). `extract/prompt.py`: English instructions only, no slang or locale hints; the sheet's own last rows are the few-shot examples, in whatever language the user writes. `extract/client.py`: call `claude-haiku-5-5` with structured output (`output_config.format`) and image blocks when present; set `output_config.effort` to `low` (Haiku 5.5 defaults to `medium` with thinking on); do not send `temperature`/`top_p`/`top_k` or an assistant prefill. Check the live API docs before writing the call; the SDK drifts. `extract/sanity.py`: category must be in the enum, the amount must be positive, and below `sanity.min_amount` (when set) triggers a follow-up.
 **USER:** needs an Anthropic Console API key with a small prepaid balance and a monthly spend limit.
-**Acceptance:** unit tests with a fake client cover slang amounts, missing amount, unknown category, image input; a live eval script over about 20 phrases is run once and results noted in the Status log.
+**Acceptance:** unit tests with a fake client cover spoken-number amounts, missing amount, unknown category, image input; a live eval script over about 20 phrases is run once and results noted in the Status log.
 
 ### [ ] 5. Google Sheets
-`sheets/client.py` (service account auth), `sheets/examples.py` (read last N rows), `sheets/dates.py` (Bogota date to serial number), `sheets/append.py` (find next empty row in A:D, write the four values, return the row number), `sheets/read_row.py` (read that row back as displayed, for the confirmation message).
+`sheets/client.py` (service account auth), `sheets/schema.py` (read row 1 and locate each role's column by its header text; read the category column's dropdown options from its data validation; fresh read on every message, no cache; fail with a clear message listing the headers found if one is missing; confirm against Mauro's duplicate that the Sheets API really returns the chip values, otherwise use `sheets.fallback_categories`), `sheets/examples.py` (read last N rows), `sheets/dates.py` (date in the configured timezone to serial number), `sheets/append.py` (find next empty row from the date column, write only the four mapped columns, return the row number), `sheets/read_row.py` (read that row back as displayed, for the confirmation message).
 **USER:** create a Google Cloud service account and JSON key, duplicate the real sheet, share the duplicate with the service account email. The agent writes `docs/setup-google.md` with exact steps. If the Google account is a Workspace org, key creation may be blocked by policy: report it.
-**Acceptance:** append a row to the duplicate; confirm date displays `dd/mm/yyyy`, Valor is numeric and formatted, the Concepto chip renders, nothing in column F onwards is touched.
+**Acceptance:** append a row to the duplicate; confirm date displays `dd/mm/yyyy`, Valor is numeric and formatted, the category chip renders, nothing outside the mapped columns is touched; the categories read from the sheet match the dropdown.
+
+### [ ] 5b. Init command
+`uv run speech-to-sheets init` creates `config.yaml` interactively. `cli/init.py` (orchestrator), `cli/prompts.py` (ask, confirm and choose helpers, injectable so tests can script answers), `cli/write_config.py` (writes `config.yaml`; asks before overwriting; never writes secrets). Flow: load the secrets from `.env`, connect to the sheet ID given, list tabs and ask which one, read row 1, propose a role-to-header mapping by best guess (names like date, amount, category, description in any language) and let the user confirm or pick from the headers found, read and show the dropdown options of the category column (if unreadable, ask for a list to store as `fallback_categories`), ask timezone and STT language, write `config.yaml`. `main.py` dispatches the `init` subcommand (wired in step 8).
+**Acceptance:** tests with scripted answers and a fake sheet cover a clean mapping, a wrong guess corrected by the user, unreadable dropdown, existing config not overwritten without confirmation; run once against Mauro's duplicate sheet and the generated config works.
 
 ### [ ] 6. Dedupe store
-`dedupe/store.py`: SQLite file (gitignored), table of Slack message ID, status (`pending`, `done`, `failed`), sheet row and created-at. API: `claim(message_id) -> bool` (atomic insert, `False` if already present), `finish(message_id, row)`, `fail(message_id)`. `dedupe/prune.py`: `prune(older_than_days)`, called once at startup. Add `dedupe.retention_days: 30` and the database path to `config.example.yaml`.
+`dedupe/store.py`: SQLite file (gitignored), table of Slack message ID, status (`pending`, `done`, `failed`), sheet row and created-at. API: `claim(message_id) -> bool` (atomic insert, `False` if already present), `finish(message_id, row)`, `fail(message_id)`. `dedupe/prune.py`: `prune(older_than_days)`, called once at startup. The `dedupe` section (`retention_days`, `path`) already exists in `config.example.yaml`.
 **Acceptance:** tests for first claim, repeat claim, finish and fail, persistence across restarts, and pruning that deletes only old entries.
 
 ### [ ] 7. Slack app
@@ -139,6 +162,14 @@ Code: `slack/client.py` (Bolt app), `slack/allowlist.py`, `slack/files.py` (down
 - **USER:** confirm switching `sheet ID` from the duplicate to the real sheet.
 **Acceptance:** reboot the Mac, send a note, row appears; README setup steps work on a clean checkout.
 
+### [ ] 11. Portable public release
+- English `README.md` aimed at a stranger: what it is, quick start (`init`, secrets, run), per-OS install notes for `whisper-cli` and `ffmpeg` (macOS Homebrew, Linux build or package, Windows release), privacy note about which data goes to Anthropic (transcripts, photos, last rows).
+- `deploy/`: launchd plist and systemd unit examples, a Dockerfile that builds whisper.cpp for servers; `docs/deployment.md` with the hardening notes above.
+- GitHub Actions workflow running the unit tests on Linux and macOS, so the portability claim is checked. Only macOS is tested by hand.
+- Remove Mauro's personal details from the repo: the "Mauro's sheet" section and category names in `PLAN.md` (or reduce `PLAN.md` to a generic contributor plan). The first commit keeps them in history; Mauro accepted that.
+- **USER:** on the real server, run one of his real voice notes through `whisper-cli` and note the time and RAM used; decide model size or server size from that.
+**Acceptance:** clean checkout on Linux: `init`, run, unit tests green in CI; no personal categories or paths in tracked files (`git grep`).
+
 ## Later (not planned)
 
 Undo or edit the last row from Slack, monthly summary, alternative STT backend (Parakeet) behind the same interface, receipt line-item splitting.
@@ -154,3 +185,4 @@ Append newest at the bottom. Format: `YYYY-MM-DD: step N: what happened, what is
 - 2026-10-25: plan updated: no audio tests or STT evals (Mauro tests with the real bot); confirmation reply shows the row read back from the sheet after a successful write.
 - 2026-10-25: step 1 done. `uv` project with Python 3.12 (`.python-version`), deps installed (slack-bolt, gspread, google-auth, anthropic, pydantic, pyyaml, python-dotenv; dev: pytest, ruff), empty packages under `src/speech_to_sheets/`, `.gitignore`, `.env.example` (secrets only: Slack tokens, Anthropic key, Google key path), `config.example.yaml` (everything non-secret: timezone, allowed Slack user ID, sheet ID and tab, whisper CLI and model path, language, model name, example row count, the 12 categories). Two guard tests: `test_file_length.py` (fails over 150 lines, warns over 100) and `test_no_barrel_files.py` (every `__init__.py` must be empty); both verified to fail on a violation. `uv run pytest` 3 passed, `uv run ruff check` clean. The script entry `speech_to_sheets.main:main` does not exist yet (step 8). Next: step 2.
 - 2026-10-25: decisions: MIT license (set on GitHub, LICENSE is on the remote main; local repo has no remote yet, Mauro pushes himself). Dedupe settled as SQLite, mark-first, 30-day pruning (see Decisions table). Next: step 2.
+- 2026-10-25: decisions: no personal data in the repo (headers via init command, categories from the sheet dropdown at runtime, config fallback), four fixed roles mapped by header text, no slang or locale hints, all config and defaults in English, cheap Linux server later (sizing in Deployment notes, unmeasured). Added step 5b (init command) and step 11 (portable release). `config.example.yaml` made generic; Mauro personal values moved to his gitignored `config.yaml`. Next: step 2.

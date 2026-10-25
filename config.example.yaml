@@ -1,34 +1,35 @@
 # Copy to config.yaml and adjust. Not secret, but personal, so config.yaml is gitignored.
+# `speech-to-sheets init` can create this file for you by reading your sheet.
 
-timezone: America/Bogota
+timezone: UTC  # IANA name, for example Europe/Madrid. Used for the date of each entry.
 
 slack:
-  allowed_user_id: ""  # your Slack member ID (U...); anyone else is ignored
+  allowed_user_id: ""  # your Slack member ID (starts with U); everyone else is ignored
 
 sheets:
   sheet_id: ""  # the long id in the spreadsheet URL
   tab: ""  # worksheet name
+  # The header text in row 1 of your sheet for each role.
+  columns:
+    date: Date
+    amount: Amount
+    category: Category
+    description: Description
+  # Only used if the dropdown options of the category column cannot be read from the sheet.
+  fallback_categories: []
 
 stt:
   whisper_cli: whisper-cli
-  model_path: ~/Library/Application Support/com.prakashjoshipax.VoiceInk/WhisperModels/ggml-large-v3-turbo-q5_0.bin
-  language: es
+  model_path: ""  # path to a whisper.cpp ggml model file, for example ggml-large-v3-turbo-q5_0.bin
+  language: auto  # for example en, es, fr; auto lets whisper detect it
 
 extract:
   model: claude-haiku-5-5
-  example_rows: 30
+  example_rows: 30  # last rows of the sheet given to the model as examples
 
-# Must match the dropdown options in the sheet exactly, accents included.
-categories:
-  - Carro
-  - Comida
-  - Servicios
-  - Educación
-  - Salud
-  - Perro
-  - Personales
-  - Herramientas
-  - Impuestos
-  - Recreación
-  - Libranza
-  - Donación
+sanity:
+  min_amount: 0  # amounts below this trigger a follow-up question; 0 turns the check off
+
+dedupe:
+  retention_days: 30
+  path: dedupe.sqlite
