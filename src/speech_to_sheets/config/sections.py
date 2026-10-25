@@ -32,8 +32,10 @@ class SheetsConfig(Section):
 
 class SttConfig(Section):
     whisper_cli: str = Field("whisper-cli", min_length=1)
+    ffmpeg: str = Field("ffmpeg", min_length=1)
     model_path: Path
     language: str = Field("auto", min_length=1)
+    timeout_seconds: int = Field(120, ge=1)
 
     @field_validator("model_path", mode="before")
     @classmethod

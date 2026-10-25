@@ -19,9 +19,13 @@ sheets:
   fallback_categories: []
 
 stt:
+  # Command names or full paths. Services (launchd, systemd) often have a short PATH,
+  # so use full paths there, for example /opt/homebrew/bin/whisper-cli.
   whisper_cli: whisper-cli
+  ffmpeg: ffmpeg
   model_path: ""  # path to a whisper.cpp ggml model file, for example ggml-large-v3-turbo-q5_0.bin
   language: auto  # for example en, es, fr; auto lets whisper detect it
+  timeout_seconds: 120  # per ffmpeg or whisper run; raise it on a slow server
 
 extract:
   model: claude-haiku-5-5

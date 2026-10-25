@@ -20,7 +20,8 @@ def test_defaults() -> None:
     assert DedupeConfig().retention_days == 30
     assert DedupeConfig().path == Path("dedupe.sqlite")
     stt = SttConfig(model_path="/m.bin")
-    assert (stt.whisper_cli, stt.language) == ("whisper-cli", "auto")
+    assert (stt.whisper_cli, stt.ffmpeg, stt.language) == ("whisper-cli", "ffmpeg", "auto")
+    assert stt.timeout_seconds == 120
 
 
 @pytest.mark.parametrize("user_id", ["", "u0123", "ABC", "U 12", "B0123ABC"])
