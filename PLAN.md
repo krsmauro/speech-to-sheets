@@ -37,13 +37,13 @@ This file is the source of truth. Several agents may work on this project in seq
 | Personalisation | Last ~30 sheet rows given to Claude as few-shot examples | Learns Mauro's naming (`Exito` without accent, `Claude` is `Herramientas`). Those rows are sent to the Anthropic API. |
 | Receipts | Photos go to Claude as images in the same call | |
 | Follow-ups | Bot asks in the Slack thread when unsure; reply by text or voice. Thread is re-read via `conversations.replies`, so no conversation state is stored. | Only write to the sheet when the entry is complete. |
-| Dedupe | Small SQLite store keyed by Slack message ID | Slack retries must not create duplicate rows. |
+| Dedupe | Small local SQLite store keyed by Slack message ID. Mark-first (at-most-once): claim the message as `pending` before doing anything, then `done` (with row number) or `failed`; never retry automatically, the user resends. Entries older than `dedupe.retention_days` (default 30) are deleted on startup. | Decided 2026-10-25. Slack can redeliver events (reconnects) and step 10 catch-up replays DMs, so repeats must not create duplicate rows. A missing row is visible (no confirmation) while a duplicate is silent. The store is never sent to Claude, so it costs no tokens; pruning is hygiene. Rejected: deduping by reading the sheet (no ID column; same-day same-amount purchases would be falsely rejected), Slack reactions as memory, memory-only. |
 | Confirmation | After the sheet write succeeds, the bot replies in the thread showing what was recorded: the row is read back from the sheet and shown (row number, date, Valor, Concepto, Descripcion) | Decided 2026-10-25. Reading back shows what is really stored, so a wrong date locale or a mangled value is visible. If the write fails, the reply says so and never claims it was logged. |
 | Testing | Unit tests with fakes only; no audio fixtures or STT evals | Decided 2026-10-25. Mauro will use the real bot as soon as the MVP works and tweak from real failures. |
 | Security | Only Mauro's Slack user ID may trigger the bot | Otherwise anyone who can DM the bot writes to a finance sheet. |
 | Sheets access | Google service account (JSON key), sheet shared with its email | Key lives outside the repo. |
 | Develop against | A duplicate of the real sheet | Switch to the real one only at the end (step 10). |
-| Licensing | VoiceInk is GPLv3: do not copy its code | Using the same model file is fine. The repo license is Mauro's choice (step 10). |
+| Licensing | VoiceInk is GPLv3: do not copy its code | Using the same model file is fine. The repo license is MIT, chosen by Mauro when he created the GitHub repo (`krsmauro/speech-to-sheets`, 2026-10-25); the `LICENSE` file lives on the remote `main`. |
 
 ## The sheet
 
@@ -80,7 +80,7 @@ src/speech_to_sheets/
   stt/       convert.py whisper.py
   extract/   schema.py prompt.py client.py sanity.py
   sheets/    client.py examples.py dates.py append.py read_row.py
-  dedupe/    store.py
+  dedupe/    store.py prune.py
   pipeline/  bundle.py handle_message.py
   main.py
 tests/       one test file per module, plus test_file_length.py
@@ -115,8 +115,8 @@ Do NOT write, generate or record audio tests or fixtures (Mauro's rule): no `say
 **Acceptance:** append a row to the duplicate; confirm date displays `dd/mm/yyyy`, Valor is numeric and formatted, the Concepto chip renders, nothing in column F onwards is touched.
 
 ### [ ] 6. Dedupe store
-`dedupe/store.py`: SQLite file (gitignored) mapping Slack message ID to sheet row, with `seen()` and `record()`.
-**Acceptance:** tests for first seen, repeat seen, and persistence across restarts.
+`dedupe/store.py`: SQLite file (gitignored), table of Slack message ID, status (`pending`, `done`, `failed`), sheet row and created-at. API: `claim(message_id) -> bool` (atomic insert, `False` if already present), `finish(message_id, row)`, `fail(message_id)`. `dedupe/prune.py`: `prune(older_than_days)`, called once at startup. Add `dedupe.retention_days: 30` and the database path to `config.example.yaml`.
+**Acceptance:** tests for first claim, repeat claim, finish and fail, persistence across restarts, and pruning that deletes only old entries.
 
 ### [ ] 7. Slack app
 Write `slack-app-manifest.yaml` and `docs/setup-slack.md`. Needs: Socket Mode, Messages tab enabled in App Home, event `message.im`, scopes `im:history`, `files:read`, `chat:write`.
@@ -125,7 +125,7 @@ Code: `slack/client.py` (Bolt app), `slack/allowlist.py`, `slack/files.py` (down
 **Acceptance:** the bot connects and echoes a test DM from Mauro's phone; messages from any other user are ignored; unit tests for allowlist and thread rebuilding.
 
 ### [ ] 8. Pipeline and entry point
-`pipeline/bundle.py` (text + transcripts + images into one extraction input), `pipeline/handle_message.py` (orchestrator: allowlist, dedupe, bundle, extract, sanity, append, read the row back, send the confirmation or the follow-up question), `main.py` (wire and start). The confirmation is sent only after the append succeeded; the dedupe record is written at the same point.
+`pipeline/bundle.py` (text + transcripts + images into one extraction input), `pipeline/handle_message.py` (orchestrator: allowlist, dedupe, bundle, extract, sanity, append, read the row back, send the confirmation or the follow-up question), `main.py` (wire and start). The orchestrator calls `claim()` first and stops if it returns `False`; it calls `finish()` only after the append succeeded (the confirmation is sent after that) and `fail()` on any handled error.
 **Acceptance:** with fakes for Slack, whisper, Claude and Sheets, tests cover: text only, voice only, photo only, `NeedsInfo` then a follow-up reply completing it, confirmation text shows the values read back from the sheet, write failure sends an error and no confirmation, duplicate event ignored, empty transcript, non-allowlisted user.
 
 ### [ ] 9. Real use on the duplicate sheet (MVP check)
@@ -136,7 +136,7 @@ Code: `slack/client.py` (Bolt app), `slack/allowlist.py`, `slack/files.py` (down
 - On start, catch up on DMs received while the Mac was asleep (Socket Mode can drop events), using the dedupe store to avoid repeats.
 - `launchd` agent with logs outside the repo; document `caffeinate` or Energy settings for sleep.
 - English `README.md` (what it is, setup, privacy note about which data goes to Anthropic).
-- **USER:** choose the repo license; confirm switching `sheet ID` from the duplicate to the real sheet.
+- **USER:** confirm switching `sheet ID` from the duplicate to the real sheet.
 **Acceptance:** reboot the Mac, send a note, row appears; README setup steps work on a clean checkout.
 
 ## Later (not planned)
@@ -145,8 +145,6 @@ Undo or edit the last row from Slack, monthly summary, alternative STT backend (
 
 ## Open questions
 
-- Repo license (step 10).
-- Whether to keep the SQLite dedupe file or derive dedupe from sheet contents (default: SQLite).
 
 ## Status log
 
@@ -155,3 +153,4 @@ Append newest at the bottom. Format: `YYYY-MM-DD: step N: what happened, what is
 - 2026-10-25: planning done. Whisper chosen over Parakeet. No code written yet. Next: step 1.
 - 2026-10-25: plan updated: no audio tests or STT evals (Mauro tests with the real bot); confirmation reply shows the row read back from the sheet after a successful write.
 - 2026-10-25: step 1 done. `uv` project with Python 3.12 (`.python-version`), deps installed (slack-bolt, gspread, google-auth, anthropic, pydantic, pyyaml, python-dotenv; dev: pytest, ruff), empty packages under `src/speech_to_sheets/`, `.gitignore`, `.env.example` (secrets only: Slack tokens, Anthropic key, Google key path), `config.example.yaml` (everything non-secret: timezone, allowed Slack user ID, sheet ID and tab, whisper CLI and model path, language, model name, example row count, the 12 categories). Two guard tests: `test_file_length.py` (fails over 150 lines, warns over 100) and `test_no_barrel_files.py` (every `__init__.py` must be empty); both verified to fail on a violation. `uv run pytest` 3 passed, `uv run ruff check` clean. The script entry `speech_to_sheets.main:main` does not exist yet (step 8). Next: step 2.
+- 2026-10-25: decisions: MIT license (set on GitHub, LICENSE is on the remote main; local repo has no remote yet, Mauro pushes himself). Dedupe settled as SQLite, mark-first, 30-day pruning (see Decisions table). Next: step 2.
