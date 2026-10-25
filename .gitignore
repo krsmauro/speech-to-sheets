@@ -21,6 +21,10 @@ credentials*.json
 *.sqlite3
 *.db
 
+# Speech-to-text models: large downloads, never commit
+models/
+*.bin
+
 # Python and tooling
 .venv/
 __pycache__/

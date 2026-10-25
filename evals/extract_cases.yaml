@@ -1,0 +1,49 @@
+# Live extraction eval: uv run python scripts/eval_extract.py evals/extract_cases.yaml
+# Generic categories and phrases only; no personal data. Copy this file to try your own
+# categories and phrases, and keep personal copies out of the repo.
+model: claude-haiku-5-5
+categories: [Food, Transport, Home, Health, Tools, Entertainment, Pets, Taxes, Education, Café]
+examples:  # recent sheet rows as displayed: date, amount, category, description
+  - ["20/10/2026", "$45.20", "Food", "Trader Joe's"]
+  - ["21/10/2026", "$12.00", "Transport", "Taxi"]
+  - ["21/10/2026", "$20.00", "Tools", "Claude"]
+  - ["22/10/2026", "$1,250.00", "Home", "Rent"]
+  - ["23/10/2026", "$65.00", "Pets", "Vet"]
+  - ["24/10/2026", "$5.25", "Café", "Starbucks"]
+cases:
+  - {name: voice supermarket, voice: true, text: "forty two eighty at Trader Joe's",
+     expect: {amount: 42.80, category: Food, description: trader joe}}
+  - {name: voice cents, voice: true, text: "paid fifty-two dollars and thirty cents for gas",
+     expect: {amount: 52.30, category: Transport}}
+  - {name: decimal text, text: "Uber 18.40", expect: {amount: 18.40, category: Transport}}
+  - {name: comma thousands, text: "rent $1,250", expect: {amount: 1250, category: Home}}
+  - {name: voice vet, voice: true, text: "two hundred dollars at the vet for the dog",
+     expect: {amount: 200, category: Pets}}
+  - {name: k suffix, text: "plane tickets 1.2k", expect: {amount: 1200, category: Transport}}
+  - {name: subscription, text: "Netflix 15.49", expect: {amount: 15.49, category: Entertainment}}
+  - {name: voice pharmacy, voice: true, text: "pharmacy, twenty seven ninety",
+     expect: {amount: 27.90, category: Health}}
+  - {name: bucks, text: "lunch with the team, 85 bucks", expect: {amount: 85, category: Food}}
+  - {name: accented category, text: "latte at Starbucks 5.75",
+     expect: {amount: 5.75, category: Café}}
+  - {name: voice tax, voice: true, text: "property tax, one thousand eight hundred",
+     expect: {amount: 1800, category: Taxes}}
+  - {name: example naming, voice: true, text: "paid Claude, twenty dollars",
+     expect: {amount: 20, category: Tools, description: claude}}
+  - {name: noisy transcript, voice: true, text: "uh... I paid, um, fifteen dollars at the, the bakery",
+     expect: {amount: 15, category: Food}}
+  - {name: small amount, voice: true, text: "a dollar fifty for parking",
+     expect: {amount: 1.50, category: Transport}}
+  - {name: course, text: "Python course on Udemy for 59.99", expect: {amount: 59.99, category: Education}}
+  - {name: other currency, text: "ChatGPT subscription, 20 euros", expect: needs_info}
+  - {name: missing amount, text: "gas at Shell", expect: needs_info}
+  - {name: not an expense, text: "hey, how are you?", expect: needs_info}
+  - {name: two expenses, voice: true, text: "taxi fifteen and lunch twenty five", expect: needs_info}
+  - name: thread, amount first
+    thread: [{author: user, text: "35"}, {author: bot, text: "What was it for?"},
+             {author: user, text: "groceries at Trader Joe's"}]
+    expect: {amount: 35, category: Food}
+  - name: thread, voice reply
+    thread: [{author: user, text: "gas"}, {author: bot, text: "How much was it?"},
+             {author: user, text: "eighty dollars", voice: true}]
+    expect: {amount: 80, category: Transport}

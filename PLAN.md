@@ -20,7 +20,7 @@ This file is the source of truth. Several agents may work on this project in seq
 - Small, single-responsibility files. Aim for under 100 lines. 150 lines is unacceptable.
 - No barrel files: every `__init__.py` stays empty; import from the module that defines the thing.
 - Orchestration files (wiring modules together) are welcome.
-- Code, comments, README, prompts and logs in English. Spanish appears only in the category config and in example phrases.
+- Everything in the repo is in English: code, comments, tests, eval cases, docs, prompts and logs (decided 2026-10-25 by Mauro). Mauro's own Spanish values (headers, categories) live only in his gitignored `config.yaml`.
 - Python 3.12 managed by `uv`. The system default is 3.14, which many libraries do not support yet.
 
 ## Decisions already made
@@ -30,51 +30,52 @@ This file is the source of truth. Several agents may work on this project in seq
 | Chat transport | Slack DM, Socket Mode (`slack_bolt`) | Already on Mauro's phone. No public URL or open port. Slack incoming webhooks cannot receive audio, so no webhook. |
 | Rejected transports | WhatsApp, Telegram | WhatsApp needs Meta business verification or unofficial libraries; Telegram was offered but Mauro prefers Slack. |
 | Speech-to-text | Local `whisper-cli` (whisper.cpp) with `ggml-large-v3-turbo-q5_0.bin` | Decided 2026-10-25. Mauro found it less finicky on hardware than Parakeet. Verified working here. |
-| Rejected STT | Parakeet v3 (parakeet-mlx, FluidAudio) | VoiceInk's copy is Core ML for Swift, not usable from Python; parakeet-mlx untested. Can be revisited later behind the same interface. |
+| Rejected STT | Parakeet v3 (parakeet-mlx, FluidAudio) | The Core ML build is for Swift apps, not usable from Python; parakeet-mlx untested. Can be revisited later behind the same interface. |
 | Audio input to Claude | Not possible | The Messages API takes text, images and PDFs, not audio. So STT stays local and Claude only sees text and images. (Not re-verified against live docs.) |
 | Extraction model | Anthropic API, `claude-haiku-5-5` | The Max plan does not cover API calls. Needs a Console API key, paid separately; cost is cents per month. Agent SDK credit on Max exists but was rejected: heavy, experimental-use only, unusable for others. |
-| Extraction method | Structured output with `Concepto` as a closed enum | Claude cannot invent a category; value matches the dropdown exactly. |
-| Personalisation | Last ~30 sheet rows given to Claude as few-shot examples | Learns Mauro's naming (`Exito` without accent, `Claude` is `Herramientas`). Those rows are sent to the Anthropic API. |
+| Extraction method | Structured output with the category as a closed enum | Claude cannot invent a category; value matches the dropdown exactly. |
+| Personalisation | Last ~30 sheet rows given to Claude as few-shot examples | Learns the user's naming habits (for example a store name written without its accent, or an AI subscription filed under tools). Those rows are sent to the Anthropic API. |
 | Receipts | Photos go to Claude as images in the same call | |
 | Follow-ups | Bot asks in the Slack thread when unsure; reply by text or voice. Thread is re-read via `conversations.replies`, so no conversation state is stored. | Only write to the sheet when the entry is complete. |
 | Dedupe | Small local SQLite store keyed by Slack message ID. Mark-first (at-most-once): claim the message as `pending` before doing anything, then `done` (with row number) or `failed`; never retry automatically, the user resends. Entries older than `dedupe.retention_days` (default 30) are deleted on startup. | Decided 2026-10-25. Slack can redeliver events (reconnects) and step 10 catch-up replays DMs, so repeats must not create duplicate rows. A missing row is visible (no confirmation) while a duplicate is silent. The store is never sent to Claude, so it costs no tokens; pruning is hygiene. Rejected: deduping by reading the sheet (no ID column; same-day same-amount purchases would be falsely rejected), Slack reactions as memory, memory-only. |
-| Confirmation | After the sheet write succeeds, the bot replies in the thread showing what was recorded: the row is read back from the sheet and shown (row number, date, Valor, Concepto, Descripcion) | Decided 2026-10-25. Reading back shows what is really stored, so a wrong date locale or a mangled value is visible. If the write fails, the reply says so and never claims it was logged. |
+| Confirmation | After the sheet write succeeds, the bot replies in the thread showing what was recorded: the row is read back from the sheet and shown (row number, date, amount, category, description) | Decided 2026-10-25. Reading back shows what is really stored, so a wrong date locale or a mangled value is visible. If the write fails, the reply says so and never claims it was logged. |
 | Testing | Unit tests with fakes only; no audio fixtures or STT evals | Decided 2026-10-25. Mauro will use the real bot as soon as the MVP works and tweak from real failures. |
 | Security | Only Mauro's Slack user ID may trigger the bot | Otherwise anyone who can DM the bot writes to a finance sheet. |
 | Sheets access | Google service account (JSON key), sheet shared with its email | Key lives outside the repo. |
 | Develop against | A duplicate of the real sheet | Switch to the real one only at the end (step 10). |
-| Licensing | VoiceInk is GPLv3: do not copy its code | Using the same model file is fine. The repo license is MIT, chosen by Mauro when he created the GitHub repo (`krsmauro/speech-to-sheets`, 2026-10-25); the `LICENSE` file lives on the remote `main`. |
+| Licensing | MIT. Never copy code from GPL or other copyleft projects into this repo. | Model files are data, not code, so using them is fine. The repo license is MIT, chosen by Mauro when he created the GitHub repo (`krsmauro/speech-to-sheets`, 2026-10-25); the `LICENSE` file lives on the remote `main`. |
 | No personal data in the repo | Column headers and categories are never hardcoded. Headers are mapped by the `speech-to-sheets init` command (connects to the sheet, proposes a mapping, asks to confirm) and stored in `config.yaml`; categories are read from the category column's dropdown at runtime, with `sheets.fallback_categories` in config as a fallback. All config keys and defaults are in English. | Decided 2026-10-25. Mauro's categories are already in the first pushed commit and he accepts that, but the final version must not contain them (step 11). |
 | Column mapping | Four fixed roles: date, amount, category, description, set in config as `sheets.columns` (role to header text in row 1). The bot finds columns by header text, writes only to those columns, and finds the next empty row from the date column. | Reordering columns or extra columns on the sheet break nothing. Arbitrary extra fields (payment method, etc.) are out of scope for now. |
-| Slang and locale hints | None. No slang lists or per-locale hint files. | Decided 2026-10-25 by Mauro. The model handles plain spoken numbers; he tunes from real use. Language, timezone and the minimum-amount check are plain config values. |
+| Slang and locale hints | None. No slang lists or per-locale hint files. | Decided 2026-10-25 by Mauro. The model handles plain spoken numbers; he tunes from real use. Language and timezone are plain config values. The prompt has one generic sentence: read written separators (dot or comma) the way the user's language and the example rows write numbers. Confirmed by Mauro 2026-10-25: we output plain numbers and the sheet formats them; the sentence is only about reading input, because a Spanish message or voice transcript may write 18.500 for eighteen thousand five hundred (whisper's Spanish output; not verified here). |
+| Amounts | Decimal numbers in any currency (`Decimal`, parsed exactly from Claude's JSON). No minimum-amount check; the only amount check is "more than zero". | Decided 2026-10-25 by Mauro: a minimum does not work across currencies, and many currencies have cents. A misheard amount is caught by reading the confirmation, which shows the row read back from the sheet. |
+| Bot language | Claude writes its follow-up questions in the language the user wrote or spoke; the few fixed texts written in code (confirmation, errors, the more-than-zero check, the fallback question) stay English. No language setting. | Decided 2026-10-25 by Mauro. Works for any user without config; the cost is a mixed-language thread for non-English users. |
 | Deployment | Mac first; later an always-on cheap Linux server | Socket Mode needs no inbound ports. Sizing notes below. |
 
 ## Mauro's sheet (development reference only)
 
 > Personal example used while developing. The code must read headers and categories from the connected sheet and never hardcode them. Step 11 removes these details from the repo.
 
-Four columns, header on row 1, filters on:
+Four columns, header on row 1, filters on. The exact header names and the 12 categories are in Mauro's gitignored `config.yaml` (`sheets.columns`, `sheets.fallback_categories`); they are Spanish and some categories have accents, so exact spelling matters.
 
-| Col | Name | Type | Notes |
+| Col | Role | Type | Notes |
 |---|---|---|---|
-| A | `Fecha` | date, shown `dd/mm/yyyy` | Taken from system time in `America/Bogota` (UTC-5). Never from the speaker. |
-| B | `Valor` | number | Integer COP. Display format `$#,###` is already on the sheet; write a plain number. |
-| C | `Concepto` | dropdown chip | One of: Carro, Comida, Servicios, Educación, Salud, Perro, Personales, Herramientas, Impuestos, Recreación, Libranza, Donación. Exact spelling, accents included. |
-| D | `Descripcion` | free text | Short merchant or item: `Ktronix`, `Exito`, `Arriendo`, `Baño`. |
+| A | date | date, shown `dd/mm/yyyy` | Taken from system time in `America/Bogota` (UTC-5). Never from the speaker. |
+| B | amount | number | Colombian pesos, in practice whole numbers. Display format `$#,###` is already on the sheet; write a plain number. |
+| C | category | dropdown chip | One of the 12 dropdown options. |
+| D | description | free text | Short merchant or item name. |
 
 Traps to handle:
 - Writing a date as text like `05/10/2026` can be parsed as May 10 if the sheet locale is US. Write a serial number and verify.
 - Column F and below the table may contain other content (the cursor was on F223). Append to an explicit next empty row in the four mapped columns, never rely on auto table detection.
-- Amounts are spoken as plain numbers (for example `veinte mil`). Mauro's sheet is in COP, so amounts under 1,000 are suspicious: `sanity.min_amount` (default 0 = off, Mauro sets 1000) makes the bot ask a follow-up instead of logging.
+- Amounts are spoken as plain numbers. A misheard amount (for example twenty instead of twenty thousand) is not caught by any check; the confirmation reply, which shows the row read back from the sheet, is where Mauro spots it.
 
 ## Environment facts (verified 2026-10-25, macOS arm64, Apple M4)
 
 - `whisper-cli` at `/opt/homebrew/bin/whisper-cli` (Homebrew, Metal backend). `ffmpeg` and `uv` also in `/opt/homebrew/bin`.
 - Machine: Apple M4, 10 cores, 24 GB RAM.
-- Model: `~/Library/Application Support/com.prakashjoshipax.VoiceInk/WhisperModels/ggml-large-v3-turbo-q5_0.bin` (547 MB). For other users the README must explain downloading it from the whisper.cpp model repository; the path is configurable.
+- Model: `models/ggml-large-v3-turbo-q5_0.bin` in the project folder (gitignored, 574,041,195 bytes). Its SHA-256 `394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2` matches the official file at `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin` (checked 2026-10-25 against the Hugging Face API). The README must explain this download; the path is configurable (`stt.model_path`).
 - Tested: 16 kHz mono wav from ffmpeg, `whisper-cli -m <model> -f <wav> -nt -l auto`, a long Spanish clip transcribed correctly in about 13 s wall time.
 - System `python3` is 3.14.5: do not use it for the project.
-- Sibling repo `../VoiceInk` exists (reference only).
 
 ## Deployment notes (cheap always-on Linux server)
 
@@ -95,13 +96,15 @@ src/speech_to_sheets/
   config/    settings.py sections.py columns.py secrets.py errors.py
   slack/     client.py allowlist.py files.py thread.py replies.py
   stt/       run.py convert.py whisper.py transcript.py voice_note.py check.py errors.py
-  extract/   schema.py prompt.py client.py sanity.py
+  extract/   inputs.py schema.py prompt.py content.py client.py errors.py sanity.py
   sheets/    client.py schema.py examples.py dates.py append.py read_row.py
   dedupe/    store.py prune.py
   pipeline/  bundle.py handle_message.py
   cli/       init.py prompts.py write_config.py
   main.py
 tests/       one test file per module, plus test_file_length.py
+scripts/     eval_extract.py (live extraction eval, costs real money)
+evals/       extract_cases.yaml (generic categories and example phrases only)
 docs/        setup-slack.md  setup-google.md  deployment.md
 deploy/      launchd and systemd examples, Dockerfile (step 11)
 ```
@@ -115,7 +118,7 @@ Create the project skeleton with `uv` (Python 3.12 pinned). Dependencies: `slack
 **Acceptance:** `uv run pytest` passes; `uv run ruff check` is clean; `git status` shows no secrets or ignored artefacts staged.
 
 ### [x] 2. Config and secrets
-`config/settings.py` loads env vars (`.env` via python-dotenv) and `config.yaml`; `config/columns.py` holds the role-to-header mapping (`sheets.columns`). Settings: Slack bot/app tokens, allowed Slack user ID, Anthropic key, Google key path, sheet ID and tab name, `sheets.columns`, `sheets.fallback_categories`, whisper CLI, model path and language (default `auto`), timezone (default `UTC`), `sanity.min_amount` (default 0 = off), `dedupe` settings. All keys and defaults are in English; see `config.example.yaml`. Fail fast with a clear message when something is missing; never log secret values.
+`config/settings.py` loads env vars (`.env` via python-dotenv) and `config.yaml`; `config/columns.py` holds the role-to-header mapping (`sheets.columns`). Settings: Slack bot/app tokens, allowed Slack user ID, Anthropic key, Google key path, sheet ID and tab name, `sheets.columns`, `sheets.fallback_categories`, whisper CLI, model path and language (default `auto`), timezone (default `UTC`), `dedupe` settings. All keys and defaults are in English; see `config.example.yaml`. Fail fast with a clear message when something is missing; never log secret values.
 **Acceptance:** unit tests for missing/invalid config and defaults; `config.example.yaml` contains only generic example values (no personal categories or paths).
 
 ### [x] 3. Speech-to-text (whisper)
@@ -124,7 +127,7 @@ Do NOT write, generate or record audio tests or fixtures (Mauro's rule): no `say
 **Acceptance:** unit tests pass with `subprocess` mocked; no audio files exist in the repo.
 
 ### [ ] 4. Extraction (Claude)
-`extract/schema.py`: result is either `Complete{valor:int, concepto:enum, descripcion:str}` or `NeedsInfo{question:str, partial}`. The enum is built at runtime from the categories read from the sheet (`sheets/schema.py`). `extract/prompt.py`: English instructions only, no slang or locale hints; the sheet's own last rows are the few-shot examples, in whatever language the user writes. `extract/client.py`: call `claude-haiku-5-5` with structured output (`output_config.format`) and image blocks when present; set `output_config.effort` to `low` (Haiku 5.5 defaults to `medium` with thinking on); do not send `temperature`/`top_p`/`top_k` or an assistant prefill. Check the live API docs before writing the call; the SDK drifts. `extract/sanity.py`: category must be in the enum, the amount must be positive, and below `sanity.min_amount` (when set) triggers a follow-up.
+`extract/schema.py`: result is either `Complete{amount: Decimal, category: enum, description: str}` or `NeedsInfo{question: str}`. The enum is built at runtime from the categories read from the sheet (`sheets/schema.py`). `extract/prompt.py`: English instructions only, no slang or locale hints; the sheet's own last rows are the few-shot examples, in whatever language the user writes. `extract/client.py`: call `claude-haiku-5-5` with structured output (`output_config.format`) and image blocks when present; set `output_config.effort` to `low` (Haiku 5.5 defaults to `medium` with thinking on); do not send `temperature`/`top_p`/`top_k` or an assistant prefill. Check the live API docs before writing the call; the SDK drifts. `extract/sanity.py`: category must be in the enum and the amount must be more than zero; otherwise the bot asks.
 **USER:** needs an Anthropic Console API key with a small prepaid balance and a monthly spend limit.
 **Acceptance:** unit tests with a fake client cover spoken-number amounts, missing amount, unknown category, image input; a live eval script over about 20 phrases is run once and results noted in the Status log.
 
@@ -145,11 +148,13 @@ Do NOT write, generate or record audio tests or fixtures (Mauro's rule): no `say
 Write `slack-app-manifest.yaml` and `docs/setup-slack.md`. Needs: Socket Mode, Messages tab enabled in App Home, event `message.im`, scopes `im:history`, `files:read`, `chat:write`.
 **USER:** create the Slack app from the manifest, install it, copy the bot token (`xoxb-`) and app-level token (`xapp-`) into `.env`, give the agent their Slack user ID.
 Code: `slack/client.py` (Bolt app), `slack/allowlist.py`, `slack/files.py` (download with the bot token in the Authorization header), `slack/thread.py` (rebuild a thread), `slack/replies.py`.
+Photos: the API accepts only JPEG, PNG, GIF and WebP, at most 5 MB each (`extract.inputs.Image` rejects other types). iPhone photos can be HEIC or larger than 5 MB. Check what Slack actually delivers; Slack's JPEG thumbnails (for example `thumb_1024`) may be enough for a receipt. Not verified yet.
 **Acceptance:** the bot connects and echoes a test DM from Mauro's phone; messages from any other user are ignored; unit tests for allowlist and thread rebuilding.
 
 ### [ ] 8. Pipeline and entry point
-`pipeline/bundle.py` (text + transcripts + images into one extraction input), `pipeline/handle_message.py` (orchestrator: allowlist, dedupe, bundle, extract, sanity, append, read the row back, send the confirmation or the follow-up question), `main.py` (wire and start). The orchestrator calls `claim()` first and stops if it returns `False`; it calls `finish()` only after the append succeeded (the confirmation is sent after that) and `fail()` on any handled error.
-**Acceptance:** with fakes for Slack, whisper, Claude and Sheets, tests cover: text only, voice only, photo only, `NeedsInfo` then a follow-up reply completing it, confirmation text shows the values read back from the sheet, write failure sends an error and no confirmation, duplicate event ignored, empty transcript, non-allowlisted user.
+`pipeline/bundle.py` (text + transcripts + images into one extraction input), `pipeline/handle_message.py` (orchestrator: allowlist, dedupe, bundle, extract, sanity, append, read the row back, send the confirmation or the follow-up question), `main.py` (wire and start). The orchestrator calls `claim()` first and stops if it returns `False`; it calls `finish()` only after the append succeeded (the confirmation is sent after that) and `fail()` on any handled error. Call `stt.check.check_stt` at startup. Extraction is `extract.client.extract` then `extract.sanity.check`; the thread becomes `Turn`s (bot messages as `author="bot"`, transcripts with `voice=True`).
+Duplicate trap: re-reading a thread that already got a confirmation would extract the same expense again. A reply in a thread that already has a confirmation must never log another row (for example, reply that the entry is already logged).
+**Acceptance:** with fakes for Slack, whisper, Claude and Sheets, tests cover: text only, voice only, photo only, `NeedsInfo` then a follow-up reply completing it, confirmation text shows the values read back from the sheet, write failure sends an error and no confirmation, duplicate event ignored, empty transcript, non-allowlisted user, a reply in an already-logged thread writes no row.
 
 ### [ ] 9. Real use on the duplicate sheet (MVP check)
 **USER:** use the bot from the phone as in daily life: text, voice notes, receipt photos, a follow-up. Mauro tweaks from real failures; the agent only fixes what he reports and records findings (accuracy, latency, odd transcripts) in the Status log. No synthetic audio testing.
@@ -158,6 +163,7 @@ Code: `slack/client.py` (Bolt app), `slack/allowlist.py`, `slack/files.py` (down
 ### [ ] 10. Run as a service, docs, go live
 - On start, catch up on DMs received while the Mac was asleep (Socket Mode can drop events), using the dedupe store to avoid repeats.
 - `launchd` agent with logs outside the repo; document `caffeinate` or Energy settings for sleep.
+- Relative paths in `config.yaml` (`stt.model_path` such as `models/...`, `dedupe.path`) resolve from the working directory, so the launchd agent must set `WorkingDirectory` to the project folder. The startup check (`check_stt`) reports a missing model.
 - English `README.md` (what it is, setup, privacy note about which data goes to Anthropic).
 - **USER:** confirm switching `sheet ID` from the duplicate to the real sheet.
 **Acceptance:** reboot the Mac, send a note, row appears; README setup steps work on a clean checkout.
@@ -166,7 +172,7 @@ Code: `slack/client.py` (Bolt app), `slack/allowlist.py`, `slack/files.py` (down
 - English `README.md` aimed at a stranger: what it is, quick start (`init`, secrets, run), per-OS install notes for `whisper-cli` and `ffmpeg` (macOS Homebrew, Linux build or package, Windows release), privacy note about which data goes to Anthropic (transcripts, photos, last rows).
 - `deploy/`: launchd plist and systemd unit examples, a Dockerfile that builds whisper.cpp for servers; `docs/deployment.md` with the hardening notes above.
 - GitHub Actions workflow running the unit tests on Linux and macOS, so the portability claim is checked. Only macOS is tested by hand.
-- Remove Mauro's personal details from the repo: the "Mauro's sheet" section and category names in `PLAN.md` (or reduce `PLAN.md` to a generic contributor plan). The first commit keeps them in history; Mauro accepted that.
+- Remove Mauro's remaining personal details from the repo: the "Mauro's sheet" section of `PLAN.md` (timezone, currency, sheet layout), or reduce `PLAN.md` to a generic contributor plan. His header and category names were already removed from `PLAN.md` on 2026-10-25. The first commit keeps them in history; Mauro accepted that.
 - **USER:** on the real server, run one of his real voice notes through `whisper-cli` and note the time and RAM used; decide model size or server size from that.
 **Acceptance:** clean checkout on Linux: `init`, run, unit tests green in CI; no personal categories or paths in tracked files (`git grep`).
 
@@ -176,6 +182,9 @@ Undo or edit the last row from Slack, monthly summary, alternative STT backend (
 
 ## Open questions
 
+Only questions Mauro has to answer, each written as a question. Notes and known limitations go in the step they affect. When Mauro answers, move the answer to the Decisions table and delete the question.
+
+(none)
 
 ## Status log
 
@@ -188,3 +197,7 @@ Append newest at the bottom. Format: `YYYY-MM-DD: step N: what happened, what is
 - 2026-10-25: decisions: no personal data in the repo (headers via init command, categories from the sheet dropdown at runtime, config fallback), four fixed roles mapped by header text, no slang or locale hints, all config and defaults in English, cheap Linux server later (sizing in Deployment notes, unmeasured). Added step 5b (init command) and step 11 (portable release). `config.example.yaml` made generic; Mauro personal values moved to his gitignored `config.yaml`. Next: step 2.
 - 2026-10-25: step 2 done. `config/` has `settings.py` (`Settings` model plus `load_settings(config_path, env_file, environ)`), `sections.py` (slack, sheets, stt, extract, sanity, dedupe models), `columns.py` (the four role headers, English defaults, must be distinct ignoring case), `secrets.py` (the four env vars; Slack tokens checked for the `xoxb-`/`xapp-` prefix, Google key file must exist), `errors.py` (`ConfigError`, `describe`). Behaviour: real environment variables win over `.env`; an empty variable counts as missing; unknown keys in `config.yaml` are errors (catches typos); secrets inside `config.yaml` are refused; all problems are reported in one `ConfigError`, and error text never contains a secret value (verified by breaking the guard and watching the test fail). Required with no default: `slack.allowed_user_id`, `sheets.sheet_id`, `sheets.tab`, `stt.model_path`. The model file is not checked for existence here (step 3 does that). `tests/` gained `conftest.py` and six `test_config_*.py` files; `config.example.yaml` is checked against the models and for personal values. `uv run pytest` 45 passed, `ruff check` and `ruff format --check` clean, no file over 100 lines. Mauro's `config.yaml` still has `sheets.tab` empty, so it will not load until he fills it in. Next: step 3.
 - 2026-10-25: step 3 done. `stt/` has `run.py` (`run_tool`: list arguments, no shell, UTF-8 with replacement, timeout; every failure becomes `SttError` naming the config key to fix; on a non-zero exit it shows the stderr lines starting with "error", because whisper-cli prints its error between backend logs and its full help text), `convert.py` (`to_wav`: ffmpeg to 16 kHz mono pcm_s16le, absolute paths so a file name cannot look like an option), `whisper.py` (`transcribe`: `whisper-cli -m <model> -f <wav> -nt -l <language>`; `-l` is always passed because whisper-cli defaults to English), `transcript.py` (`clean_transcript`: collapses whitespace, returns None when only whitespace, punctuation or tags like `[BLANK_AUDIO]` remain), `voice_note.py` (`transcribe_voice_note(bytes, stt)`: writes the audio to a private temp folder that is always deleted; no file extension, ffmpeg detects the format from content, so no Slack file name is ever used in a path), `check.py` (`check_stt`: startup check for both tools and the model; step 8 should call it in `main.py`). Config gained `stt.ffmpeg` (launchd has a short PATH, so step 10 needs full paths) and `stt.timeout_seconds` (default 120). Tests: `run_tool` against small real Python child processes; ffmpeg and whisper with `run_tool` faked; no audio anywhere. Two mutations (drop `-l`, drop the tag stripping) made the tests fail as they should. Checked against the real tools without audio: `check_stt` passes with Mauro's config; ffmpeg on non-audio bytes and whisper on a missing wav give readable errors, and the temp folder is gone afterwards. Not verified: a real voice note end to end (left to step 9, per Mauro's rule). Whisper sometimes outputs a stock sentence on silence; it is not filtered here (no phrase lists), but it has no amount, so extraction will ask instead of logging. Possible tweaks if real use shows problems: whisper's `--prompt`, `-sns` (suppress non-speech tokens). `uv run pytest` 73 passed, ruff clean. Next: step 4 (needs Mauro's Anthropic key; he says it is now in `.env`).
+- 2026-10-25: step 4 code done, NOT ticked: the live eval is blocked. `extract/` has `inputs.py` (`Turn`, `Image` limited to JPEG/PNG/GIF/WebP, `ExampleRow`, `ExtractionInput`), `schema.py` (`Complete`/`NeedsInfo`; the Pydantic output model is built at runtime with the categories as a `Literal` enum and gives both the JSON schema sent to the API and the validation of the answer; `partial` was dropped because the thread is re-read on every reply), `prompt.py` (English system prompt, categories, last rows as examples; no locale or slang hints), `content.py` (images first, then the thread as one labelled text block), `client.py` (`messages.create` with `output_config` `{effort: low, format: json_schema}`; no temperature, thinking setting or prefill; `stop_reason` is checked before parsing, because the SDK's `messages.parse` would raise a validation error first on a refusal or a cut-off; blocks are read by type since Haiku 5.5 thinks by default), `errors.py` (`ExtractError` plus API errors mapped to what to fix, using the API's own sentence), `sanity.py` (category in list, amount > 0, under `min_amount` asks). Checked against the skill docs and the live structured-outputs page (Haiku 5.5 supported, 4 union fields under the limit of 16). Tests: 111 pass, fake client only; three mutations (no refusal check, no effort, no minimum check) were caught. Live eval: `scripts/eval_extract.py` with `evals/extract_cases.yaml` (21 cases: spoken numbers, dot thousands, k suffix, accented category, other currency, missing amount, not an expense, two expenses, two threads). Ran it: every call returned 400 -credit balance is too low-; the key itself is accepted (no 401), 0 tokens used. LEFT: Mauro adds prepaid credits and a monthly spend limit in the Anthropic Console, then run `uv run python scripts/eval_extract.py` (about a cent), note the results here, tune the prompt if needed, tick step 4. Not covered by the live eval: images (no receipt photo in the repo by design).
+- 2026-10-25: changes asked by Mauro. (1) `sanity.min_amount` removed everywhere (config model, example config, his `config.yaml`, sanity check, tests): a minimum does not work across currencies. (2) Amounts are now `Decimal`, parsed exactly from Claude's JSON (the schema sends a plain `number`; 15.49 stays 15.49), so currencies with cents work; the prompt no longer says whole number and has one generic sentence on reading dot or comma separators. (3) Everything in the repo is English: the eval cases were rewritten in English with a dollar-style example sheet and decimal amounts (21 cases), Spanish test data replaced (`Café` keeps a non-ASCII category check), and `PLAN.md` no longer lists his Spanish headers, categories or example descriptions. (4) Bot language decided (see Decisions). Open questions now hold only real questions for Mauro. 116 tests pass, ruff clean. Trade-off: the committed eval no longer exercises Spanish number words or dot-thousands amounts like 18.500; real use in step 9 covers that, or a personal cases file outside the repo. Step 4 is still waiting for Anthropic credits.
+- 2026-10-25: prompt amount rule settled with Mauro: output is a plain number (the schema enforces it, so the output-format wording was removed from the prompt; the sheet does all display formatting); the separator sentence stays, for reading input such as 18.500 in Spanish text or transcripts. 116 tests pass. Step 4 still waiting for Anthropic credits.
+- 2026-10-25: whisper model moved into the project: `models/ggml-large-v3-turbo-q5_0.bin` (gitignored together with `*.bin`), SHA-256 verified against the official whisper.cpp file on Hugging Face (see Environment facts). Mauro's `config.yaml` now uses that relative path; `config.example.yaml` shows the download command. All references to the outside dictation app the model was first found in were removed from the repo at Mauro's request (the licensing rule is now a generic no-copyleft-code rule). Earlier commits still mention it; history is not rewritten.

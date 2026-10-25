@@ -12,7 +12,6 @@ from speech_to_sheets.config.secrets import Secrets
 from speech_to_sheets.config.sections import (
     DedupeConfig,
     ExtractConfig,
-    SanityConfig,
     SheetsConfig,
     SlackConfig,
     SttConfig,
@@ -28,7 +27,6 @@ class Settings(BaseModel):
     sheets: SheetsConfig = Field(default_factory=dict)
     stt: SttConfig = Field(default_factory=dict)
     extract: ExtractConfig = Field(default_factory=dict)
-    sanity: SanityConfig = Field(default_factory=dict)
     dedupe: DedupeConfig = Field(default_factory=dict)
     secrets: Secrets
 

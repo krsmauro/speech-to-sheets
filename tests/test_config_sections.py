@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from speech_to_sheets.config.sections import (
     DedupeConfig,
     ExtractConfig,
-    SanityConfig,
     SheetsConfig,
     SlackConfig,
     SttConfig,
@@ -16,7 +15,6 @@ from speech_to_sheets.config.sections import (
 def test_defaults() -> None:
     assert ExtractConfig().model == "claude-haiku-5-5"
     assert ExtractConfig().example_rows == 30
-    assert SanityConfig().min_amount == 0
     assert DedupeConfig().retention_days == 30
     assert DedupeConfig().path == Path("dedupe.sqlite")
     stt = SttConfig(model_path="/m.bin")
@@ -57,15 +55,13 @@ def test_model_path_must_be_a_non_empty_string(value: object) -> None:
         SttConfig(model_path=value)
 
 
-@pytest.mark.parametrize("model", [ExtractConfig, SanityConfig, DedupeConfig])
+@pytest.mark.parametrize("model", [ExtractConfig, DedupeConfig])
 def test_unknown_keys_are_rejected(model: type) -> None:
     with pytest.raises(ValidationError):
         model(typo=1)
 
 
 def test_numeric_limits() -> None:
-    with pytest.raises(ValidationError):
-        SanityConfig(min_amount=-1)
     with pytest.raises(ValidationError):
         DedupeConfig(retention_days=0)
     with pytest.raises(ValidationError):

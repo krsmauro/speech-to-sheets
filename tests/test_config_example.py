@@ -27,4 +27,5 @@ def test_example_has_no_personal_values() -> None:
     assert text.isascii(), "accented words suggest a personal category or phrase"
     assert data["sheets"]["fallback_categories"] == []
     assert data["slack"]["allowed_user_id"] == ""
-    assert "/Users/" not in text and "VoiceInk" not in text
+    assert "/Users/" not in text, "personal path"
+    assert "Application Support" not in text, "personal path"

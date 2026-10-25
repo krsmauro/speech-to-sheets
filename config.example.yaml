@@ -23,16 +23,16 @@ stt:
   # so use full paths there, for example /opt/homebrew/bin/whisper-cli.
   whisper_cli: whisper-cli
   ffmpeg: ffmpeg
-  model_path: ""  # path to a whisper.cpp ggml model file, for example ggml-large-v3-turbo-q5_0.bin
+  # A whisper.cpp ggml model file. models/ is gitignored, for example:
+  # curl -L -o models/ggml-large-v3-turbo-q5_0.bin \
+  #   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin
+  model_path: ""  # for example models/ggml-large-v3-turbo-q5_0.bin
   language: auto  # for example en, es, fr; auto lets whisper detect it
   timeout_seconds: 120  # per ffmpeg or whisper run; raise it on a slow server
 
 extract:
   model: claude-haiku-5-5
   example_rows: 30  # last rows of the sheet given to the model as examples
-
-sanity:
-  min_amount: 0  # amounts below this trigger a follow-up question; 0 turns the check off
 
 dedupe:
   retention_days: 30

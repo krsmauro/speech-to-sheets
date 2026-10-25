@@ -50,10 +50,6 @@ class ExtractConfig(Section):
     example_rows: int = Field(30, ge=0)
 
 
-class SanityConfig(Section):
-    min_amount: int = Field(0, ge=0)
-
-
 class DedupeConfig(Section):
     retention_days: int = Field(30, ge=1)
     path: Path = Path("dedupe.sqlite")
