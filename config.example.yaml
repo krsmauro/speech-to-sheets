@@ -1,0 +1,34 @@
+# Copy to config.yaml and adjust. Not secret, but personal, so config.yaml is gitignored.
+
+timezone: America/Bogota
+
+slack:
+  allowed_user_id: ""  # your Slack member ID (U...); anyone else is ignored
+
+sheets:
+  sheet_id: ""  # the long id in the spreadsheet URL
+  tab: ""  # worksheet name
+
+stt:
+  whisper_cli: whisper-cli
+  model_path: ~/Library/Application Support/com.prakashjoshipax.VoiceInk/WhisperModels/ggml-large-v3-turbo-q5_0.bin
+  language: es
+
+extract:
+  model: claude-haiku-5-5
+  example_rows: 30
+
+# Must match the dropdown options in the sheet exactly, accents included.
+categories:
+  - Carro
+  - Comida
+  - Servicios
+  - Educación
+  - Salud
+  - Perro
+  - Personales
+  - Herramientas
+  - Impuestos
+  - Recreación
+  - Libranza
+  - Donación

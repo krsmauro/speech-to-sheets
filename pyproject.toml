@@ -1,0 +1,33 @@
+[project]
+name = "speech-to-sheets"
+version = "0.1.0"
+description = "Log expenses into a Google Sheet from Slack voice notes, text and receipt photos"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.3.0",
+    "google-auth>=2.62.0",
+    "gspread>=6.2.1",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+    "pyyaml>=6.0.3",
+    "slack-bolt>=1.30.0",
+]
+
+[project.scripts]
+speech-to-sheets = "speech_to_sheets.main:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
