@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd agent for speech-to-sheets. Do not load this file as it is: service.sh install
+  fills in the __PLACEHOLDERS__ and writes the result to ~/Library/LaunchAgents.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>__LABEL__</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PROGRAM__</string>
+    <string>run</string>
+  </array>
+
+  <!-- config.yaml, .env and relative paths in config.yaml are read from here. -->
+  <key>WorkingDirectory</key>
+  <string>__DATA_DIR__</string>
+
+  <!-- launchd starts with a short PATH; whisper-cli and ffmpeg come from Homebrew. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <!-- Start at login and start again whenever it stops, at most once a minute: a
+       startup check that fails because the network is not up yet is simply retried. -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <key>StandardOutPath</key>
+  <string>__LOG__</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG__</string>
+</dict>
+</plist>

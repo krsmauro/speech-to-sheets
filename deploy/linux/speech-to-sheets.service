@@ -1,0 +1,64 @@
+# Runs speech-to-sheets as a systemd service, without Docker. See the README, Run it on a
+# Linux server, path B.
+# Install:
+#   sudo install -m 644 deploy/linux/speech-to-sheets.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now speech-to-sheets
+
+[Unit]
+Description=speech-to-sheets Slack bot (expenses into a Google Sheet)
+Documentation=https://github.com/krsmauro/speech-to-sheets#run-it-on-a-linux-server
+Wants=network-online.target
+After=network-online.target
+# Never give up restarting: a failed startup check (for example no network yet after a
+# reboot, or a Slack scope still missing) is retried every RestartSec.
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+User=speech-to-sheets
+Group=speech-to-sheets
+# config.yaml, models/ and dedupe.sqlite live here; relative paths in config.yaml resolve
+# from this folder.
+WorkingDirectory=/var/lib/speech-to-sheets
+# The secrets. Owned by root, mode 600: systemd reads it before it drops privileges, so the
+# bot gets the variables but cannot read or change the file.
+EnvironmentFile=/etc/speech-to-sheets/env
+# Log lines reach the journal at once.
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/speech-to-sheets/venv/bin/speech-to-sheets run
+Restart=always
+RestartSec=60
+# Python turns SIGINT into a clean stop.
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# Hardening. The bot reads its install under /opt, writes only its data folder and a
+# private /tmp (voice notes are converted to wav there), and opens outgoing connections.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/speech-to-sheets
+# /home and /root are hidden, so the Python under /opt must not link to a home folder.
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

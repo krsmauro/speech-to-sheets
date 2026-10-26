@@ -1,0 +1,44 @@
+# The image needs only these files. Everything else stays out of the build context, so
+# secrets, personal data, models and caches are never sent to Docker or baked into a layer.
+# If the Dockerfile ever copies another file, allow it here too.
+*
+!pyproject.toml
+!uv.lock
+!.python-version
+!src/
+
+# Even inside the allowed paths, keep out what .gitignore keeps out.
+# Secrets and personal config
+**/.env
+**/config.yaml
+**/secrets/
+**/service-account*.json
+**/credentials*.json
+**/*-key.json
+
+# Audio, images and databases: personal data
+**/*.wav
+**/*.m4a
+**/*.mp3
+**/*.mp4
+**/*.ogg
+**/*.aiff
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.heic
+**/*.sqlite*
+**/*.db
+
+# Speech-to-text models
+**/models/
+**/*.bin
+
+# Python and tooling
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.DS_Store

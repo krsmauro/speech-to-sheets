@@ -1,4 +1,4 @@
-# Slack app manifest for speech-to-sheets. Create the app from it: docs/setup-slack.md.
+# Slack app manifest for speech-to-sheets. Create the app from it: README, Slack setup.
 # Socket Mode: the bot opens the connection to Slack, so it needs no public URL or open port.
 _metadata:
   major_version: 2
@@ -19,6 +19,7 @@ oauth_config:
   scopes:
     bot:
       - im:history  # receive your direct messages and re-read a thread
+      - im:read  # find its direct messages, to catch up on messages sent while it was off
       - files:read  # download voice notes and photos
       - chat:write  # reply in the thread
 settings:

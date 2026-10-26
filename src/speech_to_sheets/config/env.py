@@ -21,7 +21,7 @@ def google_key_file(env_file: Path, environ: Mapping[str, str] | None = None) ->
     if not value:
         raise ConfigError(
             f"{GOOGLE_KEY_VARIABLE} is not set in the environment or {env_file}."
-            " See docs/setup-google.md."
+            " See the README, Google Sheets setup."
         )
     path = Path(value).expanduser()
     if not path.is_file():

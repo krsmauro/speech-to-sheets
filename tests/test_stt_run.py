@@ -31,7 +31,7 @@ def test_non_zero_exit_reports_the_end_of_stderr() -> None:
     command = python("import sys; sys.stderr.write('x' * 2000 + 'boom'); sys.exit(3)")
     with pytest.raises(SttError, match=r"exit code 3: x+boom$") as caught:
         run_tool(command, 10, "stt.x")
-    assert len(str(caught.value)) < 600
+    assert len(str(caught.value).removeprefix(PY)) < 600, "the tool's path may be any length"
 
 
 def test_error_lines_are_picked_out_of_noisy_stderr() -> None:
