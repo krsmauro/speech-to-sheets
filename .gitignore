@@ -17,8 +17,7 @@ credentials*.json
 *.jpg
 *.jpeg
 *.heic
-*.sqlite
-*.sqlite3
+*.sqlite*
 *.db
 
 # Speech-to-text models: large downloads, never commit
