@@ -15,7 +15,7 @@ def test_defaults_are_generic_english() -> None:
 
 
 def test_headers_are_stripped() -> None:
-    assert Columns(date="  Fecha ").date == "Fecha"
+    assert Columns(date="  When ").date == "When"
 
 
 def test_blank_header_is_rejected() -> None:

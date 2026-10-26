@@ -9,7 +9,7 @@ EXAMPLE = Path(__file__).resolve().parent.parent / "config.example.yaml"
 
 def test_example_uses_only_keys_the_settings_know() -> None:
     data = yaml.safe_load(EXAMPLE.read_text(encoding="utf-8"))
-    data["slack"]["allowed_user_id"] = "U0123ABC"
+    data["slack"]["allowed_user_ids"] = ["U0123ABC"]
     data["sheets"].update(sheet_id="sheet-123", tab="Expenses")
     data["stt"]["model_path"] = "/models/ggml-test.bin"
     data["secrets"] = {
@@ -26,6 +26,6 @@ def test_example_has_no_personal_values() -> None:
     data = yaml.safe_load(text)
     assert text.isascii(), "accented words suggest a personal category or phrase"
     assert data["sheets"]["fallback_categories"] == []
-    assert data["slack"]["allowed_user_id"] == ""
+    assert data["slack"]["allowed_user_ids"] == []
     assert "/Users/" not in text, "personal path"
     assert "Application Support" not in text, "personal path"

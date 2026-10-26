@@ -5,7 +5,7 @@ import pytest
 from gspread.exceptions import SpreadsheetNotFound, WorksheetNotFound
 
 from speech_to_sheets.sheets import client
-from speech_to_sheets.sheets.client import SCOPES, open_worksheet
+from speech_to_sheets.sheets.client import SCOPES, list_tabs, open_worksheet
 from speech_to_sheets.sheets.errors import SheetsError
 from tests.fake_sheet import api_error
 
@@ -79,3 +79,12 @@ def test_a_file_that_is_not_a_service_account_key_is_rejected(tmp_path: Path, co
     key.write_text(content)
     with pytest.raises(SheetsError, match="GOOGLE_SERVICE_ACCOUNT_FILE"):
         open_worksheet(key, "sheet-id", "Expenses")
+
+
+def test_listing_tabs_reports_api_errors() -> None:
+    class Broken:
+        def worksheets(self) -> list:
+            raise api_error(500, "Internal error")
+
+    with pytest.raises(SheetsError, match="listing the tabs: .* 500: Internal error"):
+        list_tabs(Broken())

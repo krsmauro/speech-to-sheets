@@ -1,0 +1,30 @@
+# Slack app manifest for speech-to-sheets. Create the app from it: docs/setup-slack.md.
+# Socket Mode: the bot opens the connection to Slack, so it needs no public URL or open port.
+_metadata:
+  major_version: 2
+  minor_version: 1
+display_information:
+  name: speech-to-sheets
+  description: Logs expenses into a Google Sheet from voice notes, text and receipt photos.
+  background_color: "#1d6b46"
+features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true  # you talk to the bot in its Messages tab
+    messages_tab_read_only_enabled: false  # false lets you write to it there
+  bot_user:
+    display_name: speech-to-sheets
+    always_online: false
+oauth_config:
+  scopes:
+    bot:
+      - im:history  # receive your direct messages and re-read a thread
+      - files:read  # download voice notes and photos
+      - chat:write  # reply in the thread
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.im
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

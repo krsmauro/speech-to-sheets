@@ -36,7 +36,7 @@ def find_layout(headers: list[str | None], columns: Columns) -> Layout:
         elif not matches:
             problems.append(f"sheets.columns.{role}: no header {wanted!r} in row 1")
         else:
-            letters = ", ".join(_letter(number) for number in matches)
+            letters = ", ".join(column_letter(number) for number in matches)
             problems.append(f"sheets.columns.{role}: header {wanted!r} is in columns {letters}")
     if problems:
         shown = ", ".join(header.strip() for header in headers if header and header.strip())
@@ -45,5 +45,5 @@ def find_layout(headers: list[str | None], columns: Columns) -> Layout:
     return Layout(**numbers)
 
 
-def _letter(column: int) -> str:
+def column_letter(column: int) -> str:
     return rowcol_to_a1(1, column).removesuffix("1")

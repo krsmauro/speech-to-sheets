@@ -1,12 +1,11 @@
-import os
 from collections.abc import Mapping
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import yaml
-from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from speech_to_sheets.config.env import read_env
 from speech_to_sheets.config.errors import ConfigError, describe
 from speech_to_sheets.config.secrets import Secrets
 from speech_to_sheets.config.sections import (
@@ -49,12 +48,12 @@ def load_settings(
 
     Real environment variables win over the .env file. Raises ConfigError listing every problem.
     """
-    env = {**dotenv_values(env_file), **(os.environ if environ is None else environ)}
+    env = read_env(env_file, environ)
     data = _read_yaml(config_path)
     if "secrets" in data:
         raise ConfigError(f"{config_path}: secrets belong in {env_file}, not in the config file")
     names = [field.alias for field in Secrets.model_fields.values()]
-    data["secrets"] = {name: env[name] for name in names if env.get(name)}
+    data["secrets"] = {name: env[name] for name in names if name in env}
     try:
         return Settings.model_validate(data)
     except ValidationError as error:

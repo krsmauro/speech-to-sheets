@@ -6,18 +6,19 @@ Read-only unless --append is given. Use the duplicate sheet: --append writes a r
     uv run python scripts/try_sheets.py --append  # also writes one test row and reads it back
 
 Needs GOOGLE_SERVICE_ACCOUNT_FILE (environment or .env) and the sheets section of config.yaml.
+--config and --env point at other files.
 """
 
-import os
+import argparse
 import sys
 from decimal import Decimal
 from pathlib import Path
 
 import yaml
-from dotenv import dotenv_values
 from pydantic import ValidationError
 
-from speech_to_sheets.config.errors import describe
+from speech_to_sheets.config.env import google_key_file
+from speech_to_sheets.config.errors import ConfigError, describe
 from speech_to_sheets.config.sections import SheetsConfig
 from speech_to_sheets.sheets.append import append_entry
 from speech_to_sheets.sheets.categories import read_categories
@@ -32,26 +33,30 @@ TEST_DESCRIPTION = "speech-to-sheets test row, delete me"
 
 
 def main() -> int:
-    data = yaml.safe_load(Path("config.yaml").read_text(encoding="utf-8")) or {}
+    parser = argparse.ArgumentParser(description="Check the Google Sheets connection.")
+    parser.add_argument("--append", action="store_true", help="write one test row")
+    parser.add_argument("--config", type=Path, default=Path("config.yaml"))
+    parser.add_argument("--env", type=Path, default=Path(".env"))
+    args = parser.parse_args()
+    data = yaml.safe_load(args.config.read_text(encoding="utf-8")) or {}
     try:
         sheets = SheetsConfig.model_validate(data.get("sheets") or {})
+        key = google_key_file(args.env)
     except ValidationError as error:
-        print("config.yaml, sheets section:", *describe(error), sep="\n  ")
+        print(f"{args.config}, sheets section:", *describe(error), sep="\n  ")
         return 2
-    variable = "GOOGLE_SERVICE_ACCOUNT_FILE"
-    key = os.environ.get(variable) or dotenv_values(".env").get(variable)
-    if not key:
-        print(f"{variable} is not set (environment or .env)")
+    except ConfigError as error:
+        print(error)
         return 2
     try:
-        worksheet = open_worksheet(Path(key).expanduser(), sheets.sheet_id, sheets.tab)
+        worksheet = open_worksheet(key, sheets.sheet_id, sheets.tab)
         layout = read_layout(worksheet, sheets.columns)
         print(f"Columns found: {layout}")
         categories = show_categories(worksheet, layout.category, sheets.fallback_categories)
         print("Last rows:")
         for row in read_examples(worksheet, layout, 5):
             print(f"  {row}")
-        if "--append" in sys.argv[1:]:
+        if args.append:
             day = today_in(data.get("timezone") or "UTC")
             row = append_entry(
                 worksheet,

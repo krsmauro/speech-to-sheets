@@ -57,7 +57,15 @@ If the key ever leaks, delete it in the **Keys** tab and create a new one.
 
 ## 7. Point config.yaml at the sheet
 
-In `config.yaml`, under `sheets`:
+The easy way is to let the bot read your sheet and write `config.yaml` for you:
+
+```sh
+uv run speech-to-sheets init
+```
+
+It asks for the sheet's URL, lets you pick the tab, proposes which column holds the date, amount, category and description (guessed from what the cells hold, so any header language works; you confirm or correct it), reads the category dropdown, and asks for your timezone, the Slack member IDs of everyone who may use the bot, the whisper model file and voice note language. It needs only `GOOGLE_SERVICE_ACCOUNT_FILE` from `.env`, writes nothing until the last question, and asks before replacing an existing `config.yaml`.
+
+To write it by hand instead, set these in `config.yaml`, under `sheets`:
 
 - `sheet_id`: the long ID in the sheet's URL, `https://docs.google.com/spreadsheets/d/<sheet_id>/edit`.
 - `tab`: the name of the tab at the bottom of the sheet.

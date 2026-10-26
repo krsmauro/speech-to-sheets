@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from speech_to_sheets.config.columns import Columns
 
@@ -11,8 +12,19 @@ class Section(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+MemberId = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[UW][A-Z0-9]+$")]
+
+
 class SlackConfig(Section):
-    allowed_user_id: str = Field(pattern=r"^[UW][A-Z0-9]+$")
+    # Everyone else is ignored, so nobody outside this list can write to the sheet.
+    allowed_user_ids: list[MemberId]
+
+    @field_validator("allowed_user_ids")
+    @classmethod
+    def _at_least_one(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("list the Slack member ID of each person who may use the bot")
+        return list(dict.fromkeys(value))
 
 
 class SheetsConfig(Section):

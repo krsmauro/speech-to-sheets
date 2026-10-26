@@ -8,7 +8,7 @@ import yaml
 def valid_yaml(model_path: str = "/models/ggml-test.bin") -> dict:
     """Smallest config.yaml that loads: only the keys that have no default."""
     return {
-        "slack": {"allowed_user_id": "U0123ABC"},
+        "slack": {"allowed_user_ids": ["U0123ABC"]},
         "sheets": {"sheet_id": "sheet-123", "tab": "Expenses"},
         "stt": {"model_path": model_path},
     }

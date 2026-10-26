@@ -4,7 +4,9 @@
 timezone: UTC  # IANA name, for example Europe/Madrid. Used for the date of each entry.
 
 slack:
-  allowed_user_id: ""  # your Slack member ID (starts with U); everyone else is ignored
+  # Slack member IDs (they start with U) of everyone who may use the bot, for example
+  # [U0123ABCD, U0456EFGH]. Everyone else is ignored.
+  allowed_user_ids: []
 
 sheets:
   sheet_id: ""  # the long id in the spreadsheet URL

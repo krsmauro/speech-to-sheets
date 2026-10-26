@@ -25,7 +25,17 @@ def test_defaults() -> None:
 @pytest.mark.parametrize("user_id", ["", "u0123", "ABC", "U 12", "B0123ABC"])
 def test_bad_slack_user_ids_are_rejected(user_id: str) -> None:
     with pytest.raises(ValidationError):
-        SlackConfig(allowed_user_id=user_id)
+        SlackConfig(allowed_user_ids=["U0123ABC", user_id])
+
+
+def test_several_people_may_use_the_bot() -> None:
+    slack = SlackConfig(allowed_user_ids=[" U0123ABC ", "W0456DEF", "U0123ABC"])
+    assert slack.allowed_user_ids == ["U0123ABC", "W0456DEF"]
+
+
+def test_an_empty_allowlist_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="member ID of each person"):
+        SlackConfig(allowed_user_ids=[])
 
 
 def test_sheet_id_and_tab_are_required() -> None:

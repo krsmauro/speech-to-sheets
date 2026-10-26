@@ -42,7 +42,7 @@ def test_empty_config_reports_every_required_key(write_config: Callable, env: di
     with pytest.raises(ConfigError) as caught:
         load_settings(path, NO_ENV_FILE, env)
     message = str(caught.value)
-    for key in ("slack.allowed_user_id", "sheets.sheet_id", "sheets.tab", "stt.model_path"):
+    for key in ("slack.allowed_user_ids", "sheets.sheet_id", "sheets.tab", "stt.model_path"):
         assert key in message
 
 
