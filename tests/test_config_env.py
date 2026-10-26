@@ -39,7 +39,9 @@ def test_google_key_file_expands_the_home_folder(
 
 
 def test_google_key_file_not_set_points_to_the_setup_guide(tmp_path: Path) -> None:
-    with pytest.raises(ConfigError, match="GOOGLE_SERVICE_ACCOUNT_FILE is not set.*setup-google"):
+    with pytest.raises(
+        ConfigError, match="GOOGLE_SERVICE_ACCOUNT_FILE is not set.*Google Sheets setup"
+    ):
         google_key_file(tmp_path / ".env", {})
 
 

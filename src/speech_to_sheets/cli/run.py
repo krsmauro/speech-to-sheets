@@ -6,6 +6,7 @@ from speech_to_sheets.config.errors import ConfigError
 from speech_to_sheets.config.settings import load_settings
 from speech_to_sheets.dedupe.errors import DedupeError
 from speech_to_sheets.extract.errors import ExtractError
+from speech_to_sheets.pipeline.catch_up_loop import start_catch_up
 from speech_to_sheets.pipeline.handle_message import handle_message
 from speech_to_sheets.pipeline.startup import open_services
 from speech_to_sheets.sheets.errors import SheetsError
@@ -26,11 +27,13 @@ def run_bot(config_path: Path, env_file: Path) -> int:
     try:
         settings = load_settings(config_path, env_file)
         services = open_services(settings)
+        allowed = settings.slack.allowed_user_ids
         app = build_app(
             settings.secrets.slack_bot_token.get_secret_value(),
-            settings.slack.allowed_user_ids,
+            allowed,
             lambda message, client: handle_message(message, client, services),
         )
+        start_catch_up(app.client, services, allowed, settings.dedupe.retention_days)
         logger.info("Connecting to Slack. Send the bot a direct message; Ctrl-C stops.")
         run(app, settings.secrets.slack_app_token.get_secret_value())
     except STARTUP_ERRORS as error:

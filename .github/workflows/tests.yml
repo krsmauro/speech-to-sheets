@@ -1,0 +1,31 @@
+# Lint and unit tests on Linux and macOS. The tests fake Slack, Google, Anthropic and the
+# speech-to-text tools, so they need no secrets, network services, whisper-cli or ffmpeg.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          # Same uv as the Dockerfile and the deployment guide.
+          version: "0.13.1"
+      - run: uv sync --locked
+      - run: uv run ruff check
+      - run: uv run pytest

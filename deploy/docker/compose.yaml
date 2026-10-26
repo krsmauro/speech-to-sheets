@@ -1,0 +1,35 @@
+# Runs the bot on a Linux server. From the repo root:
+#   docker compose -f deploy/docker/compose.yaml up -d --build
+# The data folder must exist and belong to user ID 10001; see the README,
+# Run it on a Linux server.
+name: speech-to-sheets
+
+services:
+  bot:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: speech-to-sheets:local
+    restart: unless-stopped
+    volumes:
+      # config.yaml, .env, google-key.json, models/ and dedupe.sqlite. Set
+      # SPEECH_TO_SHEETS_DATA to use another folder.
+      - type: bind
+        source: ${SPEECH_TO_SHEETS_DATA:-/srv/speech-to-sheets}
+        target: /data
+        bind:
+          create_host_path: false  # fail clearly instead of creating an empty folder
+    # Only /data and a scratch /tmp (voice notes being converted) are writable.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # No ports: Slack Socket Mode only makes outgoing connections.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

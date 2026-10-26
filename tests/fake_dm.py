@@ -1,6 +1,6 @@
 from slack_sdk.errors import SlackApiError
 
-# 2025-01-15 04:30 UTC, which is Tuesday 2025-01-14 23:30 in America/Bogota.
+# 2025-01-15 04:30 UTC, which is Tuesday 2025-01-14 23:30 in America/Panama.
 LATE_EVENING = 1_736_915_400
 
 
@@ -10,6 +10,7 @@ class FakeDm:
     whole thread, as Slack does. Each new message is a minute after the previous one."""
 
     channel = "D1"
+    owner = "U1"  # the person this direct message channel is with
 
     def __init__(self) -> None:
         self.messages: list[dict] = []
@@ -35,6 +36,24 @@ class FakeDm:
     def conversations_replies(self, channel: str, ts: str, **paging: object) -> dict:
         thread = [m for m in self.messages if ts in (m["ts"], m.get("thread_ts"))]
         return {"messages": thread}
+
+    def conversations_list(self, types: str, **paging: object) -> dict:
+        return {"channels": [{"id": self.channel, "user": self.owner, "is_im": True}]}
+
+    def conversations_history(self, channel: str, oldest: str, **paging: object) -> dict:
+        """Top-level messages after oldest, newest first; a thread's first message carries
+        its reply count and the time of its last reply, as Slack lists them."""
+        listed = []
+        for message in self.messages:
+            if message.get("thread_ts", message["ts"]) != message["ts"]:
+                continue  # a reply: Slack lists it only under its thread
+            if float(message["ts"]) <= float(oldest):
+                continue
+            replies = [m["ts"] for m in self.messages if m.get("thread_ts") == message["ts"]]
+            if replies:
+                message = message | {"reply_count": len(replies), "latest_reply": max(replies)}
+            listed.append(message)
+        return {"messages": listed[::-1]}
 
     def chat_postMessage(self, channel: str, thread_ts: str, text: str) -> dict:
         if self.failing_posts:

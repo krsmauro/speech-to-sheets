@@ -12,7 +12,11 @@ CREATE TABLE IF NOT EXISTS messages (
     status TEXT NOT NULL CHECK (status IN ('pending', 'done', 'failed')),
     sheet_row INTEGER,
     created_at REAL NOT NULL
-)
+);
+CREATE TABLE IF NOT EXISTS state (
+    name TEXT PRIMARY KEY,
+    value REAL NOT NULL
+);
 """
 
 
@@ -20,14 +24,15 @@ class DedupeStore:
     """Remembers which Slack messages were already handled, so a repeat never adds a row.
 
     Mark-first: claim a message before doing anything, then finish or fail it. A message is
-    never retried automatically. Only message IDs and row numbers are stored, no content.
+    never retried automatically. Only message IDs, row numbers and the time catch-up last
+    looked (see checkpoint.py) are stored, never what people wrote.
     """
 
     def __init__(self, path: Path, clock: Callable[[], float] = time.time) -> None:
         self.path = path
         self.clock = clock
         with self.transaction() as db:
-            db.execute(SCHEMA)
+            db.executescript(SCHEMA)
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:

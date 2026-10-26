@@ -1,7 +1,7 @@
 from speech_to_sheets.sheets.errors import WriteError
 from speech_to_sheets.sheets.rows import DisplayedRow
 
-# The fixed replies written in code. They stay English (see PLAN.md, Bot language);
+# The fixed replies written in code. They stay English (see the README, Design decisions);
 # Claude writes its own questions in the user's language.
 
 # Every confirmation starts with this, and a thread that holds one is never logged again.

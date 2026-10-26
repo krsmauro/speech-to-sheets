@@ -61,7 +61,7 @@ class World:
             files=self.files,
             sheets=SheetsConfig(sheet_id="sheet-1", tab="Expenses"),
             extract=ExtractConfig(),
-            timezone="America/Bogota",
+            timezone="America/Panama",
         )
 
     def send(self, text: str = "", **options: object) -> dict:

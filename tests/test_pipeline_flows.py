@@ -61,7 +61,7 @@ def test_claude_gets_the_categories_and_last_rows_of_the_sheet(tmp_path: Path) -
 
 
 def test_today_is_the_day_the_thread_started_in_the_sheet_timezone(tmp_path: Path) -> None:
-    # Sent at 23:30 in Bogota (already the 15th in UTC) and answered the next morning.
+    # Sent at 23:30 in Panama (already the 15th in UTC) and answered the next morning.
     world = World(tmp_path, ASK_AMOUNT, MARKET)
     first = world.send("market", at=LATE_EVENING)
     world.send("12.50", reply_to=first, at=LATE_EVENING + 10 * HOUR)

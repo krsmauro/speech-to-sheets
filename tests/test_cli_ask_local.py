@@ -21,7 +21,7 @@ def no_link(path: str) -> str:
     ("environ", "link", "expected"),
     [
         ({"TZ": "Europe/Madrid"}, no_link, "Europe/Madrid"),
-        ({"TZ": ":America/Bogota"}, no_link, "America/Bogota"),
+        ({"TZ": ":America/Panama"}, no_link, "America/Panama"),
         ({}, lambda p: "/var/db/timezone/zoneinfo/Asia/Tokyo", "Asia/Tokyo"),
         ({}, lambda p: "../usr/share/zoneinfo/Europe/Lisbon", "Europe/Lisbon"),
         ({}, no_link, "UTC"),
