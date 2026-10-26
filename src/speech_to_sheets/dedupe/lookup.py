@@ -1,0 +1,13 @@
+from collections.abc import Collection
+
+from speech_to_sheets.dedupe.store import DedupeStore
+
+
+def any_logged(store: DedupeStore, message_ids: Collection[str]) -> bool:
+    """True when one of these messages already put a row in the sheet (status done)."""
+    if not message_ids:
+        return False
+    marks = ", ".join("?" for _ in message_ids)
+    query = f"SELECT 1 FROM messages WHERE status = 'done' AND message_id IN ({marks}) LIMIT 1"
+    with store.transaction() as db:
+        return db.execute(query, list(message_ids)).fetchone() is not None

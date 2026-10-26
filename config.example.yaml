@@ -1,34 +1,41 @@
 # Copy to config.yaml and adjust. Not secret, but personal, so config.yaml is gitignored.
+# `speech-to-sheets init` can create this file for you by reading your sheet.
 
-timezone: America/Bogota
+timezone: UTC  # IANA name, for example Europe/Madrid. Used for the date of each entry.
 
 slack:
-  allowed_user_id: ""  # your Slack member ID (U...); anyone else is ignored
+  # Slack member IDs (they start with U) of everyone who may use the bot, for example
+  # [U0123ABCD, U0456EFGH]. Everyone else is ignored.
+  allowed_user_ids: []
 
 sheets:
   sheet_id: ""  # the long id in the spreadsheet URL
   tab: ""  # worksheet name
+  # The header text in row 1 of your sheet for each role.
+  columns:
+    date: Date
+    amount: Amount
+    category: Category
+    description: Description
+  # Only used if the dropdown options of the category column cannot be read from the sheet.
+  fallback_categories: []
 
 stt:
+  # Command names or full paths. Services (launchd, systemd) often have a short PATH,
+  # so use full paths there, for example /opt/homebrew/bin/whisper-cli.
   whisper_cli: whisper-cli
-  model_path: ~/Library/Application Support/com.prakashjoshipax.VoiceInk/WhisperModels/ggml-large-v3-turbo-q5_0.bin
-  language: es
+  ffmpeg: ffmpeg
+  # A whisper.cpp ggml model file. models/ is gitignored, for example:
+  # curl -L -o models/ggml-large-v3-turbo-q5_0.bin \
+  #   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin
+  model_path: ""  # for example models/ggml-large-v3-turbo-q5_0.bin
+  language: auto  # for example en, es, fr; auto lets whisper detect it
+  timeout_seconds: 120  # per ffmpeg or whisper run; raise it on a slow server
 
 extract:
   model: claude-haiku-5-5
-  example_rows: 30
+  example_rows: 30  # last rows of the sheet given to the model as examples
 
-# Must match the dropdown options in the sheet exactly, accents included.
-categories:
-  - Carro
-  - Comida
-  - Servicios
-  - Educación
-  - Salud
-  - Perro
-  - Personales
-  - Herramientas
-  - Impuestos
-  - Recreación
-  - Libranza
-  - Donación
+dedupe:
+  retention_days: 30
+  path: dedupe.sqlite
