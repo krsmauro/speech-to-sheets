@@ -41,3 +41,9 @@ def test_network_errors() -> None:
 def test_an_error_without_a_response_body() -> None:
     with pytest.raises(SlackError, match="unknown_error"), slack_errors("replying"):
         raise SlackApiError("failed", None)
+
+
+def test_the_reply_is_escaped_so_it_shows_as_written() -> None:
+    slack = FakeSlack()
+    post_reply(slack, "D1", "1", "Logged: AT&T <none>")
+    assert slack.posts[0]["text"] == "Logged: AT&amp;T &lt;none&gt;"

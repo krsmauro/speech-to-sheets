@@ -1,6 +1,8 @@
+from datetime import UTC, datetime
+
 import pytest
 
-from speech_to_sheets.slack.message import Message, SlackFile, parse_message
+from speech_to_sheets.slack.message import Message, SlackFile, parse_message, sent_at
 
 PHOTO = {
     "name": "IMG_1.HEIC",
@@ -70,3 +72,12 @@ def test_messages_with_files_and_bot_messages_are_kept() -> None:
     bot = parse_message({"subtype": "bot_message", "bot_id": "B1", "ts": "1.0"}, "D1")
     assert bot.from_bot
     assert parse_message({"bot_id": "B1", "user": "U9", "ts": "1.0"}, "D1").from_bot
+
+
+def test_text_arrives_as_plain_text() -> None:
+    raw = {"user": "U1", "text": "<http://amazon.com|amazon.com> AT&amp;T", "ts": "1.0"}
+    assert parse_message(raw, "D1").text == "amazon.com AT&T"
+
+
+def test_sent_at_reads_the_ts_as_utc() -> None:
+    assert sent_at("1736915400.000100") == datetime(2025, 1, 15, 4, 30, 0, 100, tzinfo=UTC)

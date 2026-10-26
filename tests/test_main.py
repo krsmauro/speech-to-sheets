@@ -32,3 +32,14 @@ def test_a_command_is_required() -> None:
     with pytest.raises(SystemExit) as caught:
         entry.main([])
     assert caught.value.code == 2
+
+
+def test_run_passes_the_file_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+    monkeypatch.setattr(entry, "run_bot", lambda *args: calls.append(args) or 0)
+    assert entry.main(["run", "--config", "other.yaml", "--env", "secrets.env"]) == 0
+    assert entry.main(["run"]) == 0
+    assert calls == [
+        (Path("other.yaml"), Path("secrets.env")),
+        (Path("config.yaml"), Path(".env")),
+    ]

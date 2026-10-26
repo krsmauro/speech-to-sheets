@@ -8,7 +8,7 @@ import pytest
 from speech_to_sheets.extract.client import extract
 from speech_to_sheets.extract.errors import ExtractError
 from speech_to_sheets.extract.inputs import ExtractionInput, Turn
-from tests.fake_anthropic import FakeClient, answer, reply
+from tests.fake_anthropic import FakeClient, answer, reply, status_error
 
 REQUEST = ExtractionInput(turns=(Turn("user", "lunch 20000"),))
 URL = "https://api.anthropic.com/v1/messages"
@@ -16,11 +16,6 @@ URL = "https://api.anthropic.com/v1/messages"
 
 def run(client: FakeClient) -> object:
     return extract(client, REQUEST, ["Food"], [], "claude-haiku-5-5", date(2026, 10, 25))
-
-
-def status_error(cls: type, code: int, body: object = None) -> anthropic.APIStatusError:
-    response = httpx2.Response(code, request=httpx2.Request("POST", URL))
-    return cls("server said no", response=response, body=body)
 
 
 LOW_CREDIT = {"type": "error", "error": {"type": "invalid_request_error", "message": "Low credit"}}

@@ -69,6 +69,16 @@ The bot answers each one in its thread with what it received: the text length, e
 
 If the Messages tab says that sending messages to this app is turned off, open **App Home** in the app's settings, make sure **Messages Tab** is on and **Allow users to send Slash commands and messages from the messages tab** is ticked, then restart Slack.
 
+## 6. Start the bot
+
+```sh
+uv run speech-to-sheets run
+```
+
+It first checks the setup (whisper and ffmpeg, the sheet's headers and categories, the Anthropic key and model) and stops with a message naming what to fix. Then send an expense in the same Messages tab, such as `lunch 12.50`, a voice clip or a receipt photo. The bot answers in the message's thread, either with `Logged in row ...` and the row as the sheet shows it, or with a question.
+
+Answer a question in its thread (tap the reply under it), not as a new message: a new message counts as a new expense. A reply in a thread that is already logged logs nothing. If something fails, the answer says what; replying in that thread tries again. Stop the bot with Ctrl-C.
+
 ## What the bot can see
 
 Only direct messages sent to it, and the files in them. It cannot read channels or other people's conversations. Messages from anyone not in `slack.allowed_user_ids` are ignored and never read further.
@@ -83,4 +93,4 @@ An app you create in your own workspace counts as an internal app for Slack's ra
 | `connecting with SLACK_APP_TOKEN: ... invalid_auth` | Copy the app-level token again, or generate a new one with `connections:write`. |
 | `missing_scope: add ...` | Add that scope under **OAuth & Permissions**, then reinstall the app. |
 | `Slack sent a login page instead of the file` | The app lacks `files:read`: add it and reinstall. |
-| The bot never answers | Check that the script is running and that the person's member ID is in `slack.allowed_user_ids`; the terminal logs `Ignored a direct message from Slack user ...` when it is not. |
+| The bot never answers | Check that the bot (or the check script) is running and that the person's member ID is in `slack.allowed_user_ids`; the terminal logs `Ignored a direct message from Slack user ...` when it is not. |

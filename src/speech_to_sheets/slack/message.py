@@ -1,4 +1,7 @@
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+from speech_to_sheets.slack.text import to_plain
 
 # Message subtypes that are something someone sent. Edits, deletions, joins and the like
 # are not, and are ignored. A message with files has no subtype or the old file_share one;
@@ -33,7 +36,7 @@ class Message:
     channel: str
     ts: str
     user: str
-    text: str
+    text: str  # plain text, Slack's markup already undone
     from_bot: bool = False
     thread_ts: str | None = None
     files: tuple[SlackFile, ...] = field(default_factory=tuple)
@@ -57,11 +60,16 @@ def parse_message(raw: dict, channel: str) -> Message | None:
         channel=channel,
         ts=raw["ts"],
         user=raw.get("user", ""),
-        text=raw.get("text", ""),
+        text=to_plain(raw.get("text", "")),
         from_bot="bot_id" in raw,
         thread_ts=raw.get("thread_ts"),
         files=tuple(_file(item) for item in raw.get("files", []) if not item.get("is_external")),
     )
+
+
+def sent_at(ts: str) -> datetime:
+    """When a Slack message was sent: its ts is seconds since 1970, in UTC."""
+    return datetime.fromtimestamp(float(ts), tz=UTC)
 
 
 def _file(raw: dict) -> SlackFile:
