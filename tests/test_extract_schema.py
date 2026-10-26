@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -15,10 +16,11 @@ from tests.fake_anthropic import answer
 
 # An accented category checks that non-ASCII values survive the schema round trip.
 MODEL = build_output_model(["Food", "Café"])
+TODAY = date(2026, 10, 25)
 
 
 def parse(**fields: object) -> Complete | NeedsInfo:
-    return to_result(MODEL.model_validate(answer(**fields)))
+    return to_result(MODEL.model_validate(answer(**fields)), TODAY)
 
 
 def test_schema_is_strict_and_lists_the_categories() -> None:
@@ -31,6 +33,11 @@ def test_schema_is_strict_and_lists_the_categories() -> None:
 def test_amount_is_a_plain_number_in_the_schema() -> None:
     amount = MODEL.model_json_schema()["properties"]["amount"]
     assert amount["anyOf"] == [{"type": "number"}, {"type": "null"}]
+
+
+def test_date_is_an_iso_date_string_or_null_in_the_schema() -> None:
+    day = MODEL.model_json_schema()["properties"]["date"]
+    assert day["anyOf"] == [{"type": "string", "format": "date"}, {"type": "null"}]
 
 
 @pytest.mark.parametrize("raw", ["15.49", "0.1", "1234567.89", "20000"])
@@ -53,7 +60,20 @@ def test_no_categories_is_an_error() -> None:
 
 def test_complete_answer() -> None:
     result = parse(status="complete", amount=4.5, category="Café", description=" Latte ")
-    assert result == Complete(Decimal("4.5"), "Café", "Latte")
+    assert result == Complete(Decimal("4.5"), "Café", "Latte", TODAY)
+
+
+def test_a_date_from_claude_is_kept() -> None:
+    result = parse(
+        status="complete", amount=9, category="Food", description="Bakery", date="2026-10-24"
+    )
+    assert result == Complete(Decimal(9), "Food", "Bakery", date(2026, 10, 24))
+
+
+def test_a_date_that_is_not_a_date_fails_validation() -> None:
+    data = answer(status="complete", amount=1, category="Food", date="yesterday")
+    with pytest.raises(ValidationError):
+        MODEL.model_validate(data)
 
 
 @pytest.mark.parametrize(

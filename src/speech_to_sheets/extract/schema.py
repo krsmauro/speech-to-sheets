@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -16,6 +17,7 @@ class Complete:
     amount: Decimal
     category: str
     description: str
+    day: date
 
 
 @dataclass(frozen=True)
@@ -42,12 +44,14 @@ def build_output_model(categories: list[str]) -> type[BaseModel]:
         amount=(Amount | None, ...),
         category=(Literal[tuple(categories)] | None, ...),
         description=(str | None, ...),
+        date=(date | None, ...),
         question=(str | None, ...),
     )
 
 
-def to_result(output: BaseModel) -> Result:
-    """Complete only when Claude says so and every field is filled; otherwise a question."""
+def to_result(output: BaseModel, today: date) -> Result:
+    """Complete only when Claude says so and every field is filled; otherwise a question.
+    No date from Claude means the expense is from today."""
     description = (output.description or "").strip()
     if (
         output.status == "complete"
@@ -55,5 +59,5 @@ def to_result(output: BaseModel) -> Result:
         and output.category
         and description
     ):
-        return Complete(output.amount, output.category, description)
+        return Complete(output.amount, output.category, description, output.date or today)
     return NeedsInfo((output.question or "").strip() or FALLBACK_QUESTION)

@@ -30,5 +30,5 @@ def reply(payload: dict | str, stop_reason: str = "end_turn") -> SimpleNamespace
 
 def answer(**fields: object) -> dict:
     """A schema-shaped answer with every field null unless given."""
-    keys = ("status", "amount", "category", "description", "question")
+    keys = ("status", "amount", "category", "description", "date", "question")
     return {key: fields.get(key) for key in keys}

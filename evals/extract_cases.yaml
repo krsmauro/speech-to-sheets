@@ -2,6 +2,7 @@
 # Generic categories and phrases only; no personal data. Copy this file to try your own
 # categories and phrases, and keep personal copies out of the repo.
 model: claude-haiku-5-5
+today: 2026-10-25  # a Sunday; every case expects this date unless it gives its own
 categories: [Food, Transport, Home, Health, Tools, Entertainment, Pets, Taxes, Education, Café]
 examples:  # recent sheet rows as displayed: date, amount, category, description
   - ["20/10/2026", "$45.20", "Food", "Trader Joe's"]
@@ -47,3 +48,15 @@ cases:
     thread: [{author: user, text: "gas"}, {author: bot, text: "How much was it?"},
              {author: user, text: "eighty dollars", voice: true}]
     expect: {amount: 80, category: Transport}
+  - {name: yesterday, text: "yesterday I paid 12 for a taxi",
+     expect: {amount: 12, category: Transport, date: 2026-10-24}}
+  - {name: weekday, voice: true, text: "on Friday, forty dollars at the vet",
+     expect: {amount: 40, category: Pets, date: 2026-10-23}}
+  - {name: written date like the sheet, text: "Uber 23.10 on 22/10",
+     expect: {amount: 23.10, category: Transport, date: 2026-10-22}}
+  - {name: old date asks, text: "paid the vet 120 on July 3", expect: needs_info}
+  - name: old date confirmed
+    thread: [{author: user, text: "paid the vet 120 on July 3"},
+             {author: bot, text: "July 3 was more than two months ago. Is that the right date?"},
+             {author: user, text: "yes"}]
+    expect: {amount: 120, category: Pets, date: 2026-07-03}

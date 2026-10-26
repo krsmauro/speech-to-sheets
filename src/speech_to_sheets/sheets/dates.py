@@ -6,7 +6,8 @@ SERIAL_EPOCH = date(1899, 12, 30)
 
 
 def today_in(timezone: str, now: datetime | None = None) -> date:
-    """Today's date in the configured timezone. Never taken from what the user said."""
+    """The date in the configured timezone, today or at the given moment (such as when a
+    Slack message was sent)."""
     zone = ZoneInfo(timezone)
     return (now or datetime.now(zone)).astimezone(zone).date()
 

@@ -1,3 +1,5 @@
+from datetime import date
+
 import anthropic
 from pydantic import ValidationError
 
@@ -23,22 +25,24 @@ def extract(
     categories: list[str],
     examples: list[ExampleRow],
     model: str,
+    today: date,
 ) -> Result:
-    """Ask Claude for one sheet row. Raises ExtractError with a message safe to show."""
+    """Ask Claude for one sheet row. `today` is the day the user sent the message, in the
+    sheet's timezone. Raises ExtractError with a message safe to show."""
     output_model = build_output_model(categories)
     output_format = {"type": "json_schema", "schema": output_model.model_json_schema()}
     try:
         response = client.messages.create(
             model=model,
             max_tokens=MAX_TOKENS,
-            system=build_system_prompt(categories, examples),
+            system=build_system_prompt(categories, examples, today),
             messages=[{"role": "user", "content": build_user_content(request)}],
             output_config={"effort": EFFORT, "format": output_format},
         )
     except anthropic.APIError as error:
         raise ExtractError(describe_api_error(error)) from None
     try:
-        return to_result(output_model.model_validate_json(_answer_text(response)))
+        return to_result(output_model.model_validate_json(_answer_text(response)), today)
     except ValidationError:
         raise ExtractError("Claude's answer did not match the expected format") from None
 

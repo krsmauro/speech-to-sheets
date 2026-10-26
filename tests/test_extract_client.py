@@ -1,4 +1,5 @@
 import base64
+from datetime import date
 from decimal import Decimal
 
 from speech_to_sheets.extract.client import extract
@@ -8,11 +9,12 @@ from tests.fake_anthropic import FakeClient, answer, reply
 
 CATEGORIES = ["Food", "Transport"]
 EXAMPLES = [ExampleRow("01/10/2026", "$45.20", "Food", "Market")]
+TODAY = date(2026, 10, 25)
 COMPLETE = answer(status="complete", amount=12.5, category="Food", description="Market")
 
 
 def run(client: FakeClient, request: ExtractionInput) -> Complete | NeedsInfo:
-    return extract(client, request, CATEGORIES, EXAMPLES, "claude-haiku-5-5")
+    return extract(client, request, CATEGORIES, EXAMPLES, "claude-haiku-5-5", TODAY)
 
 
 def text_input(text: str, voice: bool = False) -> ExtractionInput:
@@ -28,6 +30,7 @@ def test_request_follows_haiku_5_5_rules() -> None:
     assert not {"temperature", "top_p", "top_k", "thinking"} & call.keys()
     assert [m["role"] for m in call["messages"]] == ["user"], "no assistant prefill"
     assert "- Transport" in call["system"] and "Market" in call["system"]
+    assert "Today is Sunday 2026-10-25." in call["system"]
 
 
 def test_category_enum_in_the_schema_comes_from_the_sheet() -> None:
@@ -44,7 +47,7 @@ def test_spoken_amount_transcript_reaches_claude_and_decimal_comes_back() -> Non
     result = run(client, text_input("twelve fifty at the market", voice=True))
     text = client.calls[0]["messages"][0]["content"][-1]["text"]
     assert "User (voice note transcript): twelve fifty at the market" in text
-    assert result == Complete(Decimal("12.5"), "Food", "Market")
+    assert result == Complete(Decimal("12.5"), "Food", "Market", TODAY)
 
 
 def test_missing_amount_becomes_a_question() -> None:
@@ -61,3 +64,11 @@ def test_image_is_sent_before_the_text() -> None:
     assert image_block["source"]["media_type"] == "image/jpeg"
     assert base64.b64decode(image_block["source"]["data"]) == receipt.data
     assert "only the attached image" in text_block["text"]
+
+
+def test_a_date_claude_read_replaces_today() -> None:
+    receipt_day = answer(
+        status="complete", amount=12.5, category="Food", description="Market", date="2026-10-22"
+    )
+    result = run(FakeClient(reply(receipt_day)), text_input("market 12.50 on Thursday"))
+    assert result == Complete(Decimal("12.5"), "Food", "Market", date(2026, 10, 22))

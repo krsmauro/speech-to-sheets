@@ -9,6 +9,7 @@ Needs ANTHROPIC_API_KEY in the environment or in .env; no other secret is requir
 import os
 import sys
 import time
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -45,7 +46,7 @@ def to_input(case: dict) -> ExtractionInput:
     return ExtractionInput(turns=turns)
 
 
-def passes(result: object, expect: str | dict) -> bool:
+def passes(result: object, expect: str | dict, today: date) -> bool:
     if expect == "needs_info":
         return isinstance(result, NeedsInfo)
     if not isinstance(result, Complete):
@@ -54,8 +55,10 @@ def passes(result: object, expect: str | dict) -> bool:
     wanted_amount = Decimal(str(expect.get("amount", result.amount)))
     wanted_category = expect.get("category", result.category)
     wanted_description = expect.get("description", "").casefold()
+    # Every case checks the date: a message that names no day must be logged as today.
     return (
-        result.amount == wanted_amount
+        result.day == expect.get("date", today)
+        and result.amount == wanted_amount
         and result.category == wanted_category
         and wanted_description in result.description.casefold()
     )
@@ -70,19 +73,22 @@ def main() -> int:
         return 2
     client = UsageRecorder(make_client(key))
     examples = [ExampleRow(*map(str, row)) for row in data.get("examples", [])]
+    today = data["today"]  # fixed, so relative dates in the cases always mean the same day
     passed = 0
     previous_error = None
     for case in data["cases"]:
         start = time.monotonic()
         try:
-            result = extract(client, to_input(case), data["categories"], examples, data["model"])
+            result = extract(
+                client, to_input(case), data["categories"], examples, data["model"], today
+            )
         except ExtractError as error:
             result = f"ERROR: {error}"
             if result == previous_error:
                 print(f"Stopping: the same error twice in a row.\n{result}")
                 return 1
             previous_error = result
-        ok = passes(result, case["expect"])
+        ok = passes(result, case["expect"], today)
         passed += ok
         print(
             f"{'PASS' if ok else 'FAIL'} {time.monotonic() - start:4.1f}s  {case['name']}: {result}"

@@ -1,3 +1,4 @@
+from datetime import date
 from types import SimpleNamespace
 
 import anthropic
@@ -14,7 +15,7 @@ URL = "https://api.anthropic.com/v1/messages"
 
 
 def run(client: FakeClient) -> object:
-    return extract(client, REQUEST, ["Food"], [], "claude-haiku-5-5")
+    return extract(client, REQUEST, ["Food"], [], "claude-haiku-5-5", date(2026, 10, 25))
 
 
 def status_error(cls: type, code: int, body: object = None) -> anthropic.APIStatusError:
